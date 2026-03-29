@@ -1,0 +1,1772 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!--
+  ================================================================
+  SHADOWED ECHOES - A First-Person Horror Exploration Game
+  ================================================================
+  Description : Single-file Victorian mansion horror game built
+                with Three.js. Explore 13 interconnected rooms,
+                solve puzzles, survive a stalking entity, and
+                uncover the dark secrets of Ashwood Manor.
+  Controls    : WASD to move, Mouse to look, Click to interact,
+                E to examine nearest object, ESC to release cursor
+  Text Parser : Type commands in the bottom input box.
+                Examples: "examine painting", "take key",
+                "open door", "use brass key on library door",
+                "read note", "push bookshelf", "inventory"
+  Hosting     : Drop this file into any GitHub repository and
+                enable GitHub Pages — no build step required.
+  License     : MIT License
+                Copyright (c) 2026
+                Permission is hereby granted, free of charge,
+                to any person obtaining a copy of this software.
+  Made with   : Three.js (https://threejs.org)
+                Web Audio API
+  ================================================================
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHADOWED ECHOES</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Creepster&family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#000;overflow:hidden;font-family:'Special Elite',cursive;color:#c00}
+  #c{display:block;width:100vw;height:100vh}
+  #ui{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10}
+
+  /* Crosshair */
+  #xhair{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:20px;height:20px;pointer-events:none}
+  #xhair::before,#xhair::after{content:'';position:absolute;background:rgba(180,0,0,0.8)}
+  #xhair::before{width:2px;height:100%;left:50%;transform:translateX(-50%)}
+  #xhair::after{width:100%;height:2px;top:50%;transform:translateY(-50%)}
+
+  /* Sanity */
+  #sanity-wrap{position:absolute;top:16px;left:16px;width:200px}
+  #sanity-label{font-size:11px;letter-spacing:2px;color:#900;text-transform:uppercase;margin-bottom:4px}
+  #sanity-bar-bg{width:100%;height:10px;background:#1a0000;border:1px solid #500}
+  #sanity-bar{height:100%;background:linear-gradient(90deg,#600,#c00);transition:width .5s;width:100%}
+
+  /* Timer */
+  #timer{position:absolute;top:40px;left:16px;font-size:10px;color:#600;letter-spacing:1px}
+
+  /* Inventory */
+  #inv{position:absolute;top:16px;right:16px;text-align:right;max-width:220px}
+  #inv-title{font-size:11px;letter-spacing:2px;color:#900;text-transform:uppercase;margin-bottom:4px}
+  #inv-list{font-size:11px;color:#a44;line-height:1.6}
+
+  /* Interact prompt */
+  #prompt{position:absolute;top:57%;left:50%;transform:translateX(-50%);font-size:13px;color:#c88;letter-spacing:1px;opacity:0;transition:opacity .3s;text-align:center;text-shadow:0 0 8px #c00}
+
+  /* Log */
+  #log-wrap{position:absolute;bottom:56px;left:0;right:0;padding:0 16px;pointer-events:none}
+  #log{font-size:12px;color:#b66;line-height:1.7;max-height:110px;overflow:hidden}
+  #log p{padding:1px 0;text-shadow:0 0 4px #900}
+  #log p.new{color:#e88}
+
+  /* Input */
+  #cmd-wrap{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:center;background:rgba(0,0,0,0.85);border-top:1px solid #400;padding:8px 12px;pointer-events:all}
+  #cmd-wrap span{color:#600;margin-right:8px;font-size:13px;flex-shrink:0}
+  #cmd{background:transparent;border:none;outline:none;color:#e88;font-family:'Special Elite',cursive;font-size:13px;flex:1;caret-color:#c00}
+  #cmd::placeholder{color:#500}
+
+  /* Vignette / Overlay */
+  #vignette{position:absolute;inset:0;background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,0.85) 100%);pointer-events:none}
+  #flicker{position:absolute;inset:0;background:rgba(0,0,0,0);pointer-events:none;transition:background .05s}
+  #blood{position:absolute;inset:0;background:rgba(120,0,0,0);pointer-events:none;transition:background .3s}
+  #noise{position:absolute;inset:0;opacity:0;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");mix-blend-mode:overlay}
+
+  /* Start Screen */
+  #start{position:fixed;inset:0;background:#000;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+  #start h1{font-family:'Creepster',cursive;font-size:clamp(36px,8vw,80px);color:#c00;text-shadow:0 0 30px #900,0 0 60px #600;letter-spacing:6px;animation:flicker-text 4s infinite}
+  #start .subtitle{font-size:14px;color:#600;letter-spacing:4px;margin:8px 0 30px;text-transform:uppercase}
+  #start .story{max-width:600px;font-size:13px;color:#844;line-height:1.9;margin-bottom:30px;border:1px solid #300;padding:20px;background:rgba(20,0,0,0.6)}
+  #start .controls{max-width:600px;font-size:11px;color:#633;line-height:2;margin-bottom:30px;text-align:left;columns:2;gap:30px}
+  #start button{font-family:'Creepster',cursive;font-size:22px;color:#c00;background:transparent;border:2px solid #600;padding:12px 40px;cursor:pointer;letter-spacing:3px;text-transform:uppercase;transition:all .3s;pointer-events:all}
+  #start button:hover{background:#200;border-color:#c00;text-shadow:0 0 10px #f00;box-shadow:0 0 20px #600}
+
+  /* End Screen */
+  #endscreen{position:fixed;inset:0;background:#000;z-index:100;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px}
+  #endscreen h2{font-family:'Creepster',cursive;font-size:clamp(28px,6vw,60px);color:#c00;text-shadow:0 0 20px #900;margin-bottom:20px;letter-spacing:4px}
+  #endscreen p{max-width:560px;font-size:13px;color:#844;line-height:1.9;margin-bottom:30px}
+  #endscreen button{font-family:'Creepster',cursive;font-size:18px;color:#c00;background:transparent;border:1px solid #600;padding:10px 30px;cursor:pointer;letter-spacing:2px;pointer-events:all}
+  #endscreen button:hover{background:#200}
+
+  @keyframes flicker-text{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}95%{opacity:1}97%{opacity:.2}98%{opacity:1}}
+  @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-4px,2px)}50%{transform:translate(4px,-2px)}75%{transform:translate(-2px,4px)}}
+  .shaking{animation:shake .15s infinite}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="vignette"></div>
+  <div id="flicker"></div>
+  <div id="blood"></div>
+  <div id="noise"></div>
+  <div id="xhair"></div>
+  <div id="sanity-wrap">
+    <div id="sanity-label">SANITY</div>
+    <div id="sanity-bar-bg"><div id="sanity-bar"></div></div>
+  </div>
+  <div id="timer"></div>
+  <div id="inv"><div id="inv-title">INVENTORY</div><div id="inv-list">— empty —</div></div>
+  <div id="prompt"></div>
+  <div id="log-wrap"><div id="log"></div></div>
+  <div id="cmd-wrap">
+    <span>&gt;_</span>
+    <input id="cmd" type="text" placeholder="type a command..." autocomplete="off" spellcheck="false">
+  </div>
+</div>
+<div id="start">
+  <h1>SHADOWED ECHOES</h1>
+  <div class="subtitle">A Victorian Horror Experience</div>
+  <div class="story">
+    You awaken on the cold stone floor of Ashwood Manor, your memory a shredded ruin.
+    Rain hammers the shuttered windows. The grandfather clock in the hall has stopped at 3:13 AM.
+    Somewhere deep in the house, something exhales.<br><br>
+    The Ashwood family vanished seventeen years ago. The locals say the house consumed them.
+    They say it is still hungry. They say something still walks its halls — something that was
+    once a man, before grief and obsession hollowed it out and filled the void with darkness.<br><br>
+    Find the golden key. Find the truth. Escape before dawn — or join the Ashwoods forever.
+  </div>
+  <div class="controls">
+    <b style="color:#a44">MOVEMENT</b><br>
+    W / A / S / D — Walk<br>
+    Mouse — Look around<br>
+    Click canvas — Lock cursor<br>
+    ESC — Release cursor<br>
+    E — Examine / Interact<br>
+    <br>
+    <b style="color:#a44">COMMANDS</b><br>
+    examine [object]<br>
+    take [item]<br>
+    open / close [door]<br>
+    use [item] on [target]<br>
+    read [note/diary]<br>
+    push [bookshelf]<br>
+    look around<br>
+    inventory / i<br>
+    go [room name]<br>
+  </div>
+  <button id="start-btn">ENTER THE MANOR</button>
+</div>
+<div id="endscreen">
+  <h2 id="end-title">YOU ARE DEAD</h2>
+  <p id="end-msg"></p>
+  <button onclick="location.reload()">PLAY AGAIN</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+// ================================================================
+// SHADOWED ECHOES — Core Game Engine
+// ================================================================
+
+// ── Globals ──────────────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000000, 0.04);
+scene.background = new THREE.Color(0x000000);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.7, 0);
+
+window.addEventListener('resize', () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+});
+
+// ── Pointer Lock Controls (inline) ───────────────────────────────
+class PLControls {
+  constructor(cam, dom) {
+    this.cam = cam; this.dom = dom; this.isLocked = false;
+    this._ev = {};
+    const eu = new THREE.Euler(0,0,0,'YXZ');
+    const PI2 = Math.PI/2;
+    this._mm = e => {
+      if(!this.isLocked) return;
+      eu.setFromQuaternion(cam.quaternion);
+      eu.y -= (e.movementX||0)*0.002;
+      eu.x -= (e.movementY||0)*0.002;
+      eu.x = Math.max(-PI2+0.05, Math.min(PI2-0.05, eu.x));
+      cam.quaternion.setFromEuler(eu);
+    };
+    this._plc = () => {
+      if(document.pointerLockElement === dom) {
+        this.isLocked=true; this._dispatch('lock');
+      } else {
+        this.isLocked=false; this._dispatch('unlock');
+      }
+    };
+    document.addEventListener('mousemove', this._mm);
+    document.addEventListener('pointerlockchange', this._plc);
+  }
+  on(t,fn){ (this._ev[t]=this._ev[t]||[]).push(fn); return this; }
+  _dispatch(t){ (this._ev[t]||[]).forEach(f=>f()); }
+  lock(){ this.dom.requestPointerLock(); }
+  unlock(){ document.exitPointerLock(); }
+  forward(d){
+    const v=new THREE.Vector3();
+    v.setFromMatrixColumn(this.cam.matrix,0);
+    v.crossVectors(this.cam.up,v);
+    this.cam.position.addScaledVector(v,d);
+  }
+  right(d){
+    const v=new THREE.Vector3();
+    v.setFromMatrixColumn(this.cam.matrix,0);
+    this.cam.position.addScaledVector(v,d);
+  }
+}
+const controls = new PLControls(camera, canvas);
+controls.on('lock', ()=>{ document.getElementById('xhair').style.opacity='1'; });
+controls.on('unlock', ()=>{ document.getElementById('xhair').style.opacity='0.4'; });
+
+// ── Audio Engine ──────────────────────────────────────────────────
+let audioCtx = null;
+const sounds = {};
+
+function initAudio() {
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  sounds.masterGain = audioCtx.createGain();
+  sounds.masterGain.gain.value = 0.6;
+  sounds.masterGain.connect(audioCtx.destination);
+}
+
+function makeNoise(freq, type, dur, vol, delay=0) {
+  if(!audioCtx) return;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.type = type; o.frequency.value = freq;
+  g.gain.setValueAtTime(0, audioCtx.currentTime+delay);
+  g.gain.linearRampToValueAtTime(vol, audioCtx.currentTime+delay+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime+delay+dur);
+  o.connect(g); g.connect(sounds.masterGain);
+  o.start(audioCtx.currentTime+delay);
+  o.stop(audioCtx.currentTime+delay+dur+0.05);
+}
+
+function makeBuffer(dur, fn) {
+  if(!audioCtx) return null;
+  const sr = audioCtx.sampleRate;
+  const buf = audioCtx.createBuffer(1, sr*dur, sr);
+  const d = buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=fn(i,d.length,sr);
+  return buf;
+}
+
+function playBuffer(buf, vol=0.5, loop=false, dest=null) {
+  if(!audioCtx||!buf) return null;
+  const src = audioCtx.createBufferSource();
+  const g = audioCtx.createGain();
+  src.buffer=buf; src.loop=loop; g.gain.value=vol;
+  src.connect(g); g.connect(dest||sounds.masterGain);
+  src.start();
+  return {src,gain:g};
+}
+
+function buildAmbient() {
+  const buf = makeBuffer(4, (i,len,sr)=>{
+    const t=i/sr;
+    return (Math.sin(2*Math.PI*55*t)*0.3 + Math.sin(2*Math.PI*82*t)*0.15
+      + (Math.random()-0.5)*0.04) * Math.sin(Math.PI*i/len);
+  });
+  sounds.ambient = playBuffer(buf,0.18,true);
+}
+
+function buildHeartbeat() {
+  const buf = makeBuffer(1.2, (i,len,sr)=>{
+    const t=i/sr;
+    const b1=Math.exp(-t*30)*Math.sin(2*Math.PI*60*t);
+    const b2=Math.exp(-(t-0.15)*30)*Math.sin(2*Math.PI*55*(t-0.15)) * (t>0.15?1:0);
+    return (b1+b2)*0.6;
+  });
+  sounds.heartbeatBuf = buf;
+}
+
+function playCreak() {
+  makeNoise(120,'sawtooth',0.8,0.12);
+  makeNoise(95,'sawtooth',0.6,0.08,0.1);
+  makeNoise(140,'sawtooth',0.4,0.06,0.3);
+}
+
+function playDoorSlam() {
+  makeNoise(80,'sawtooth',0.4,0.4);
+  makeNoise(60,'square',0.3,0.35,0.05);
+  const buf=makeBuffer(0.5,(i,l,sr)=>(Math.random()-0.5)*(1-i/l)*0.8);
+  playBuffer(buf,0.5);
+}
+
+function playWhisper() {
+  if(!audioCtx) return;
+  const buf=makeBuffer(2,(i,l,sr)=>{
+    const t=i/sr;
+    const env=Math.sin(Math.PI*i/l);
+    return (Math.random()-0.5)*env*0.3*(0.5+0.5*Math.sin(2*Math.PI*3*t));
+  });
+  playBuffer(buf,0.3);
+}
+
+function playJumpScare() {
+  makeNoise(200,'sawtooth',0.6,0.9);
+  makeNoise(150,'square',0.5,0.7,0.05);
+  const buf=makeBuffer(0.6,(i,l,sr)=>(Math.random()-0.5)*(1-i/l)*1.0);
+  playBuffer(buf,0.7);
+}
+
+function playFootstep() {
+  makeNoise(80+(Math.random()*40),'sawtooth',0.15,0.08);
+}
+
+function playChildLaughter() {
+  if(!audioCtx) return;
+  const buf=makeBuffer(1.5,(i,l,sr)=>{
+    const t=i/sr;
+    const env=Math.sin(Math.PI*i/l)*0.4;
+    const f=600+200*Math.sin(2*Math.PI*4*t);
+    return Math.sin(2*Math.PI*f*t)*env*(Math.random()>0.5?1:-1)*0.5;
+  });
+  playBuffer(buf,0.25);
+}
+
+// ── Material Library ──────────────────────────────────────────────
+const MAT = {
+  wall:    new THREE.MeshLambertMaterial({color:0x2a1f1a}),
+  wallDk:  new THREE.MeshLambertMaterial({color:0x1a120e}),
+  floor:   new THREE.MeshLambertMaterial({color:0x1c1008}),
+  ceiling: new THREE.MeshLambertMaterial({color:0x150e0a}),
+  wood:    new THREE.MeshLambertMaterial({color:0x3b2010}),
+  stone:   new THREE.MeshLambertMaterial({color:0x252220}),
+  red:     new THREE.MeshLambertMaterial({color:0x8b0000}),
+  dark:    new THREE.MeshLambertMaterial({color:0x0d0d0d}),
+  brass:   new THREE.MeshLambertMaterial({color:0x8b6914}),
+  iron:    new THREE.MeshLambertMaterial({color:0x333333}),
+  gold:    new THREE.MeshLambertMaterial({color:0xd4af37, emissive:0x443300}),
+  candle:  new THREE.MeshLambertMaterial({color:0xf5deb3, emissive:0x332200}),
+  monster: new THREE.MeshLambertMaterial({color:0x050505, emissive:0x110000}),
+  doll:    new THREE.MeshLambertMaterial({color:0xc8a882}),
+  glass:   new THREE.MeshLambertMaterial({color:0x334455, transparent:true, opacity:0.4}),
+  book:    new THREE.MeshLambertMaterial({color:0x4a2010}),
+  paper:   new THREE.MeshLambertMaterial({color:0xe8dcc8}),
+  blood:   new THREE.MeshLambertMaterial({color:0x6b0000, emissive:0x1a0000}),
+};
+
+// ── Room Box Builder ──────────────────────────────────────────────
+function buildRoom(x, z, w, d, h, mats) {
+  const group = new THREE.Group();
+  // Floor
+  const fl = new THREE.Mesh(new THREE.BoxGeometry(w,0.1,d), mats.floor||MAT.floor);
+  fl.position.set(0,-0.05,0); group.add(fl);
+  // Ceiling
+  const ce = new THREE.Mesh(new THREE.BoxGeometry(w,0.1,d), mats.ceiling||MAT.ceiling);
+  ce.position.set(0,h+0.05,0); group.add(ce);
+  // Walls: north, south, east, west
+  [[-1,0],[1,0],[0,-1],[0,1]].forEach(([nx,nz],i)=>{
+    const isNS = i<2;
+    const ww = isNS ? w : 0.15;
+    const wd = isNS ? 0.15 : d;
+    const px = isNS ? 0 : nx*(w/2+0.075);
+    const pz = isNS ? nz*(d/2+0.075) : 0;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(ww,h,wd), mats.wall||MAT.wall);
+    wall.position.set(px, h/2, pz);
+    group.add(wall);
+  });
+  group.position.set(x, 0, z);
+  scene.add(group);
+  return group;
+}
+
+// ── Ambient Light (very dim) ──────────────────────────────────────
+const ambLight = new THREE.AmbientLight(0x110808, 0.3);
+scene.add(ambLight);
+
+// ── Room Definitions ─────────────────────────────────────────────
+// Each room: id, name, pos(x,z), size(w,d), h, description, connections, items
+const ROOMS = {
+  entrance_hall: {
+    id:'entrance_hall', name:'Entrance Hall',
+    x:0, z:0, w:10, d:12, h:4,
+    desc:"You stand in the grand entrance hall of Ashwood Manor. Crumbling wallpaper peels from the walls in long strips. A massive chandelier hangs dark overhead, its candles long dead. The front door — your only exit — is sealed with an ornate golden lock. A grandfather clock stands silent, hands frozen at 3:13. Staircases rise on either side toward the upper floor. Hallways lead north to the dining room and east to the library.",
+    exits:{north:'dining_room', east:'library', up:'upstairs_hallway', west:'kitchen'},
+    items:['old_photograph','diary_page_1'],
+    lights:[{x:0,y:3.2,z:0,col:0x442211,int:0.6,dist:12}],
+    dark:false
+  },
+  dining_room: {
+    id:'dining_room', name:'Dining Room',
+    x:0, z:-16, w:12, d:10, h:3.5,
+    desc:"A long mahogany table dominates the room, set for a dinner party that never came. Tarnished silverware lies scattered. Melted candles have dripped into grotesque formations. A portrait of the Ashwood patriarch stares down from above the fireplace — his eyes seem to follow you. A cold draft seeps under the kitchen door to the west. Serving dishes still contain the desiccated remnants of a feast.",
+    exits:{south:'entrance_hall', west:'kitchen', north:'basement_stairs'},
+    items:['torn_note_1','candle'],
+    lights:[{x:0,y:3,z:0,col:0x331100,int:0.5,dist:10}],
+    dark:false
+  },
+  kitchen: {
+    id:'kitchen', name:'Kitchen',
+    x:-15, z:-8, w:9, d:9, h:3,
+    desc:"The kitchen reeks of rot and decay. Iron pots hang from ceiling hooks. The stone hearth is cold and filled with ash. A butcher's block bears deep, frantic scratches — not from knives. Shelves of mouldering provisions line the walls. A locked door in the corner leads to the servant quarters. Broken crockery crunches underfoot.",
+    exits:{east:'entrance_hall', south:'dining_room', north:'servant_quarters'},
+    items:['matches','iron_key'],
+    lights:[{x:0,y:2.5,z:0,col:0x221100,int:0.4,dist:8}],
+    dark:false,
+    lockedDoors:{servant_quarters:{key:'iron_key', msg:"The servant quarters door is padlocked shut. There must be a key somewhere."}}
+  },
+  library: {
+    id:'library', name:'Library',
+    x:15, z:-4, w:11, d:11, h:4,
+    desc:"Floor-to-ceiling bookshelves crowd every wall. Thousands of volumes gather dust, many fallen open to pages of arcane diagrams. A leather armchair faces the cold fireplace. A reading desk holds a magnifying glass and scattered papers. One bookshelf on the north wall looks subtly different from the others — its books are arranged in a strange pattern. The brass key you found suggests a locked door somewhere in this house...",
+    exits:{west:'entrance_hall'},
+    items:['diary_page_2','brass_key_found'],
+    lights:[{x:0,y:3.5,z:0,col:0x221408,int:0.5,dist:11}],
+    dark:false,
+    lockedEntry:{key:'brass_key', msg:"The library door is locked. You need a brass key."},
+    puzzles:{bookshelf:{solved:false, reveals:'hidden_study'}}
+  },
+  upstairs_hallway: {
+    id:'upstairs_hallway', name:'Upstairs Hallway',
+    x:0, z:-26, w:6, d:20, h:3,
+    desc:"A long corridor stretches ahead, doors on either side. Faded portraits of stern-faced ancestors line the walls. The floorboards creak hideously with every step. At the far end, a door leads to the attic. Strange scratches mark the wainscoting — long, desperate gouges at shoulder height. A child's music box lies broken on the floor, its mechanism still twitching.",
+    exits:{south:'entrance_hall', east:'master_bedroom', west:'bedroom2', north:'bathroom', up:'attic'},
+    items:['diary_page_3','strange_doll'],
+    lights:[{x:0,y:2.5,z:-5,col:0x1a0a0a,int:0.4,dist:8},{x:0,y:2.5,z:5,col:0x1a0a0a,int:0.3,dist:6}],
+    dark:false
+  },
+  master_bedroom: {
+    id:'master_bedroom', name:'Master Bedroom',
+    x:12, z:-28, w:10, d:10, h:3,
+    desc:"Lord Ashwood's bedroom. A four-poster bed dominates the room, its canopy rotted to tatters. The vanity mirror is shattered — seven pieces of glass lie arranged on the floor in a deliberate pattern. A writing desk holds a half-finished letter, the ink long dried. The wardrobe stands slightly ajar. Something has been scratching at the inside of the wardrobe door.",
+    exits:{west:'upstairs_hallway'},
+    items:['diary_page_4','torn_note_2'],
+    lights:[{x:0,y:2.5,z:0,col:0x1a0808,int:0.45,dist:9}],
+    dark:false
+  },
+  bedroom2: {
+    id:'bedroom2', name:"Child's Bedroom",
+    x:-12, z:-28, w:9, d:9, h:3,
+    desc:"This was a child's room once. Moth-eaten stuffed animals sit in a ring on the floor as if conducting a ritual. Crayon drawings cover the walls — scenes of a tall, dark figure watching from doorways, from windows, from beneath beds. The drawings grow progressively more frantic. The last drawing, scrawled in red, simply says: IT KNOWS WE CAN SEE IT. A tiny bed is perfectly made, as if waiting.",
+    exits:{east:'upstairs_hallway'},
+    items:['torn_note_3'],
+    lights:[{x:0,y:2.5,z:0,col:0x150808,int:0.4,dist:8}],
+    dark:false
+  },
+  bathroom: {
+    id:'bathroom', name:'Bathroom',
+    x:0, z:-38, w:7, d:6, h:2.8,
+    desc:"A Victorian bathroom with a clawfoot tub. The tub is filled with black water, still as glass. The mirror above the basin is coated in grime — except where someone has written in the condensation: CHECK BEHIND THE CLOCK. The writing has been written and re-written, repeatedly, obsessively. The floorboards near the tub are soft and discoloured, as if perpetually wet.",
+    exits:{south:'upstairs_hallway'},
+    items:['torn_note_4'],
+    lights:[{x:0,y:2.3,z:0,col:0x0a0a15,int:0.3,dist:7}],
+    dark:false
+  },
+  attic: {
+    id:'attic', name:'Attic',
+    x:0, z:-48, w:14, d:14, h:3,
+    desc:"The attic is a cathedral of shadows and forgotten things. Draped furniture lurks under moth-eaten sheets. Trunks and hatboxes teeter in towers. A single small window admits a sliver of moonlight, illuminating swirling dust. At the centre of the room, a pentagram has been chalked on the floorboards — recently, judging by the freshness of the chalk. A trapdoor in the floor leads back down.",
+    exits:{down:'upstairs_hallway'},
+    items:['diary_page_5','golden_key'],
+    lights:[{x:0,y:2.5,z:0,col:0x0a0808,int:0.25,dist:10}],
+    dark:true
+  },
+  basement: {
+    id:'basement', name:'Basement',
+    x:0, z:16, w:14, d:14, h:3,
+    desc:"Absolute darkness. The air is cold and damp. Water drips somewhere in the black. You cannot see your hand in front of your face. The darkness presses in like a physical weight. Something moved near you — you are certain of it. You need a light source.",
+    descLit:"The basement is revealed in flickering candlelight. Stone walls weep moisture. Iron shackles hang from the ceiling — sized for a human. A workbench holds Lord Ashwood's journals, open to pages of increasingly unhinged writing. In the corner, behind a fallen shelf, something glints. The exit code written on the wall in what appears to be dried blood reads: THE ANSWER IS IN THE LETTERS OF THE DEAD.",
+    exits:{up:'dining_room'},
+    items:['torn_note_5','lantern'],
+    lights:[],
+    dark:true, needsLight:true
+  },
+  servant_quarters: {
+    id:'servant_quarters', name:"Servant's Quarters",
+    x:-15, z:6, w:8, d:8, h:2.8,
+    desc:"A cramped room with a narrow iron bed and a single wooden chest. The servants who lived here left in great haste — half-packed bags still sit by the door. A hasty note is pinned to the pillow. On the wall, scratched with something sharp: IT TAKES THE FACE OF THOSE IT KILLS. The chest is unlocked.",
+    exits:{south:'kitchen'},
+    items:['torn_note_6','old_photograph_2'],
+    lights:[{x:0,y:2.3,z:0,col:0x100808,int:0.35,dist:7}],
+    dark:false
+  },
+  hidden_study: {
+    id:'hidden_study', name:'Hidden Study',
+    x:22, z:-4, w:7, d:7, h:3,
+    desc:"Behind the false bookshelf lies Lord Ashwood's secret study. Maps and diagrams cover every surface. A ritual circle is painted on the floor in silver and black. Three large candles burn with an unnatural blue flame — they should not still be burning after seventeen years. The centrepiece is a leather-bound tome: THE ASHWOOD CODEX. Beside it, a final diary entry explains everything. A hidden ladder leads down to the basement.",
+    exits:{west:'library', down:'basement'},
+    items:['ashwood_codex'],
+    lights:[{x:0,y:2.5,z:0,col:0x001122,int:0.8,dist:8}],
+    dark:false, hidden:true
+  },
+  grand_staircase: {
+    id:'grand_staircase', name:'Grand Staircase',
+    x:0, z:-13, w:8, d:6, h:5,
+    desc:"The grand staircase sweeps upward in two curving flights. The carpet runner is stained with dark patches. The banister has been recently gripped — the dust has been disturbed in clear handprints. At the base of the stairs, a child's shoe sits alone.",
+    exits:{south:'entrance_hall', north:'upstairs_hallway'},
+    items:[],
+    lights:[{x:0,y:4,z:0,col:0x220d0a,int:0.4,dist:10}],
+    dark:false
+  },
+};
+
+// ── Item Definitions ─────────────────────────────────────────────
+const ITEMS = {
+  old_photograph: {
+    id:'old_photograph', name:'Old Photograph', short:'photograph',
+    look:'A sepia photograph of the Ashwood family: Lord Edmund, Lady Vera, and their daughter Clara. Written on the back in faded ink: "Summer, 1889. Before the darkness came."',
+    room:'entrance_hall', canTake:true, taken:false
+  },
+  diary_page_1: {
+    id:'diary_page_1', name:'Diary Page (I)', short:'diary page',
+    look:'Dated October 3rd, 1889. "The ritual failed again. The entity did not manifest — or perhaps it did, and I simply cannot perceive it yet. Vera thinks I have lost my mind. Clara has stopped speaking. The servants are fleeing one by one. I am so close. I can feel it watching from the spaces between rooms, breathing in the dark."',
+    room:'entrance_hall', canTake:true, taken:false
+  },
+  torn_note_1: {
+    id:'torn_note_1', name:'Torn Note (1)', short:'torn note',
+    look:'Half a note, torn roughly. The legible portion reads: "...the golden key is not in the house. It is IN the house. Think of what the house contains that cannot be seen from outside. The attic holds—" The rest is torn away.',
+    room:'dining_room', canTake:true, taken:false
+  },
+  candle: {
+    id:'candle', name:'Wax Candle', short:'candle',
+    look:'A thick white candle, half-burned. Its wick is blackened. You would need matches to light it.',
+    room:'dining_room', canTake:true, taken:false
+  },
+  matches: {
+    id:'matches', name:'Box of Matches', short:'matches',
+    look:'A small box of safety matches. Most are intact. These could light a candle — or perhaps a lantern.',
+    room:'kitchen', canTake:true, taken:false
+  },
+  iron_key: {
+    id:'iron_key', name:'Iron Key', short:'iron key',
+    look:'A heavy iron key, dark with age. A tag attached reads: "Servant Quarters." Someone has also scratched a warning into the metal: DO NOT GO ALONE.',
+    room:'kitchen', canTake:true, taken:false
+  },
+  brass_key: {
+    id:'brass_key', name:'Brass Key', short:'brass key',
+    look:'A handsome brass key with a decorative bow. The word "LIBRARY" is engraved along its shaft.',
+    room:null, canTake:true, taken:false, hidden:true,
+    hideLocation:'entrance_hall', hideBehind:'grandfather clock',
+    hideHint:'The bathroom mirror says to check behind the clock.'
+  },
+  diary_page_2: {
+    id:'diary_page_2', name:'Diary Page (II)', short:'diary page',
+    look:'Dated October 17th, 1889. "I have translated the Codex fully. The entity feeds on grief and obsession — which means I have been feeding it for years without knowing. It has grown strong. It walks the halls now. I hear its footsteps. It has taken the shape of a man, my shape, my face. Vera saw it last night and screamed for an hour. I cannot blame her."',
+    room:'library', canTake:true, taken:false
+  },
+  diary_page_3: {
+    id:'diary_page_3', name:'Diary Page (III)', short:'diary page',
+    look:'Dated November 2nd, 1889. "Clara is gone. We found her room empty this morning. The window was locked from the inside. The entity left her music box on her pillow. It is taunting us. Vera has barricaded herself in the bathroom. I am writing this in the upstairs hallway, listening. The thing that wears my face is walking below. I can hear it counting — counting the rooms, counting the steps, counting us."',
+    room:'upstairs_hallway', canTake:true, taken:false
+  },
+  strange_doll: {
+    id:'strange_doll', name:'Porcelain Doll', short:'doll',
+    look:'A porcelain doll with long black hair and a white dress. Its eyes are painted an unnerving shade of grey. When you look away and look back, its head has moved — just slightly. The dress has a name embroidered on it: CLARA.',
+    room:'upstairs_hallway', canTake:true, taken:false
+  },
+  diary_page_4: {
+    id:'diary_page_4', name:'Diary Page (IV)', short:'diary page',
+    look:'Dated November 14th, 1889. "I have discovered a way to bind it. The Codex describes a seal — seven components, one for each face it has stolen. I have six. The seventh is in the hidden study, the room behind the library. But the entity stands at the library door every night now, waiting. I think it knows what I am planning. The brass key is my last protection. I will hide it — behind the clock, where it cannot reach because it hates the sound of ticking. Or perhaps because it knows time stopped for it long ago."',
+    room:'master_bedroom', canTake:true, taken:false
+  },
+  torn_note_2: {
+    id:'torn_note_2', name:'Torn Note (2)', short:'torn note',
+    look:'"...the bookshelf sequence is: pull the red spine, then the black spine, then the white spine, in that order. The passage will open. God help whoever reads this — go quickly, do not linger, and do not look at the candles."',
+    room:'master_bedroom', canTake:true, taken:false
+  },
+  torn_note_3: {
+    id:'torn_note_3', name:'Torn Note (3)', short:'torn note',
+    look:'Written in a child\'s handwriting: "I can see it when I close my eyes. It is tall and it has Daddy\'s face but it is not Daddy. Daddy\'s eyes are warm. Its eyes are empty like holes. I tried to tell Mama but she cries. I sleep with my light on but the light goes out. It turns off the lights. Please somebody help us please please pl—" The note ends there.',
+    room:'bedroom2', canTake:true, taken:false
+  },
+  torn_note_4: {
+    id:'torn_note_4', name:'Torn Note (4)', short:'torn note',
+    look:'"THE ENTITY CANNOT CROSS RUNNING WATER. THE ENTITY CANNOT ABIDE FIRELIGHT. THE ENTITY IS DRAWN TO GRIEF AND MADNESS. IF YOUR SANITY FAILS, IT WILL FIND YOU NO MATTER WHERE YOU HIDE. STAY CALM. STAY CALM. STAY CALM." The last two words fill the remaining space of the page, written smaller and smaller until they are microscopic.',
+    room:'bathroom', canTake:true, taken:false
+  },
+  diary_page_5: {
+    id:'diary_page_5', name:'Diary Page (V)', short:'diary page',
+    look:'Dated December 1st, 1889. "This is my last entry. The binding failed. The entity has taken Vera. It stands in the hall below and wears her face now. I am going to the attic — I have hidden the golden key in the rafters. If someone finds this: the key unlocks the front door. Take it and run. Do not try to fight it. Do not try to understand it. Just run. And please — if you find any trace of Clara — please tell someone she was loved. That she was so loved. E.A."',
+    room:'attic', canTake:true, taken:false
+  },
+  golden_key: {
+    id:'golden_key', name:'Golden Key', short:'golden key',
+    look:'A heavy ornate key of tarnished gold. The bow is shaped like an ouroboros — a serpent eating its tail. This is the key to the front door of Ashwood Manor. This is your way out.',
+    room:'attic', canTake:true, taken:false
+  },
+  torn_note_5: {
+    id:'torn_note_5', name:'Torn Note (5)', short:'torn note',
+    look:'"It lives in the dark between rooms. It moves through walls the way water moves through stone — slowly, inexorably. The shackles you see here are mine. I chained myself here to resist the urge to open the door when it knocks. It always knocks three times. Do not open the door when it knocks three times."',
+    room:'basement', canTake:true, taken:false
+  },
+  lantern: {
+    id:'lantern', name:'Oil Lantern', short:'lantern',
+    look:'A Victorian oil lantern with a cracked chimney. It still has oil in it. If you had something to light it with, it would provide reliable illumination.',
+    room:'basement', canTake:true, taken:false
+  },
+  torn_note_6: {
+    id:'torn_note_6', name:'Torn Note (6)', short:'torn note',
+    look:'Written by a servant: "We are leaving. We have been paid through the month but no amount of money is worth this. The master has gone mad. The mistress screams in the night. Something walks the halls that is not any of the family. Cook saw its face in the kitchen window and quit on the spot. If you are reading this: LEAVE THE HOUSE. Whatever he summoned, whatever it is — it is real, it is hungry, and it does not let go."',
+    room:'servant_quarters', canTake:true, taken:false
+  },
+  old_photograph_2: {
+    id:'old_photograph_2', name:'Servant Group Photo', short:'photograph',
+    look:'A photograph of the household staff, 1887. Twelve people, formally posed. On the back, all twelve names are listed — and below them, in different ink: "All gone by November 1889. The last to flee was Thomas, the footman. He never spoke of what he saw. He died in an asylum three years later, still mute."',
+    room:'servant_quarters', canTake:true, taken:false
+  },
+  ashwood_codex: {
+    id:'ashwood_codex', name:'The Ashwood Codex', short:'codex',
+    look:'A leather-bound tome of horrifying power. Its pages seem to absorb light. Reading it is profoundly disturbing — not because of what it says, but because of the feeling that the book is reading you back. The final pages describe the binding ritual in full. You understand now what Lord Ashwood was trying to do, and why he failed, and what he sacrificed, and what was lost.',
+    room:'hidden_study', canTake:true, taken:false
+  },
+  torn_note_7: {
+    id:'torn_note_7', name:'Final Note', short:'final note',
+    look:'"The only way to permanently banish the entity is to complete the ritual Lord Ashwood began. But the ritual requires a living participant to choose to remain. Someone must stay. The manor must have its keeper. Or — you could simply run. Take the golden key. Use it on the front door. Run and never look back. The entity cannot leave the property. It is bound here whether you complete the ritual or not. The choice is yours: freedom, or a final act of sacrifice that will free all future souls from this place."',
+    room:'hidden_study', canTake:true, taken:false
+  },
+};
+
+// Add final note to hidden_study
+ROOMS.hidden_study.items.push('torn_note_7');
+
+// ── Game State ───────────────────────────────────────────────────
+const GS = {
+  started: false,
+  currentRoom: 'entrance_hall',
+  inventory: [],
+  sanity: 100,
+  deaths: 0,
+  gameOver: false,
+  litBasement: false,
+  bookselfSolved: false,
+  hiddenStudyRevealed: false,
+  hasReadAllDiaries: false,
+  monsterKills: 0,
+  startTime: 0,
+  gameTime: 0,
+  doorsSeen: {},        // rooms visited
+  lockedDoors: {        // locked door states
+    library: true,
+    servant_quarters: true,
+  },
+  visitedRooms: new Set(),
+  monsterRoom: 'basement',
+  monsterTimer: 0,
+  monsterAlerted: false,
+  monsterChasing: false,
+  monsterCatchTimer: 0,
+  jumpscareTimer: 0,
+  flickerTimer: 0,
+  whisperTimer: Math.random()*30+20,
+  footstepTimer: 0,
+  heartbeatNode: null,
+  heartbeatPlaying: false,
+  lastPos: new THREE.Vector3(),
+  examineTarget: null,
+  diariesRead: 0,
+};
+
+// ── 3D Scene Objects ──────────────────────────────────────────────
+const roomMeshes = {};    // roomId -> THREE.Group
+const roomLights = {};    // roomId -> [PointLight]
+const itemMeshes = {};    // itemId -> THREE.Mesh (interactables in world)
+const monsterMesh = { obj: null };
+const doorMeshes = {};    // 'roomA_roomB' -> mesh
+
+function buildRoomGeometry(roomId) {
+  const r = ROOMS[roomId];
+  if(!r) return;
+  const group = new THREE.Group();
+  const { x, z, w, d, h } = r;
+  const fm = MAT.floor; const cm = MAT.ceiling;
+  const wm = r.dark ? MAT.wallDk : MAT.wall;
+
+  // Floor
+  const fl = new THREE.Mesh(new THREE.BoxGeometry(w,0.12,d), fm);
+  fl.position.set(0,-0.06,0); fl.receiveShadow=true; group.add(fl);
+  // Ceiling
+  const ce = new THREE.Mesh(new THREE.BoxGeometry(w,0.12,d), cm);
+  ce.position.set(0,h+0.06,0); group.add(ce);
+  // North wall
+  const wN = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.15), wm);
+  wN.position.set(0,h/2,-d/2-0.075); group.add(wN);
+  // South wall
+  const wS = new THREE.Mesh(new THREE.BoxGeometry(w,h,0.15), wm);
+  wS.position.set(0,h/2,d/2+0.075); group.add(wS);
+  // East wall
+  const wE = new THREE.Mesh(new THREE.BoxGeometry(0.15,h,d), wm);
+  wE.position.set(w/2+0.075,h/2,0); group.add(wE);
+  // West wall
+  const wW = new THREE.Mesh(new THREE.BoxGeometry(0.15,h,d), wm);
+  wW.position.set(-w/2-0.075,h/2,0); group.add(wW);
+
+  // Trim / skirting boards
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(w,0.2,0.08), MAT.wood);
+  trim.position.set(0,0.1,-d/2); group.add(trim);
+
+  group.position.set(x, 0, z);
+  scene.add(group);
+  roomMeshes[roomId] = group;
+
+  // Lights
+  roomLights[roomId] = [];
+  (r.lights||[]).forEach(ld=>{
+    const pl = new THREE.PointLight(ld.col, ld.int, ld.dist);
+    pl.position.set(x+ld.x, ld.y, z+ld.z);
+    pl.castShadow=false;
+    pl._baseInt = ld.int; pl._baseCol = ld.col;
+    scene.add(pl);
+    roomLights[roomId].push(pl);
+  });
+}
+
+function addFurniture(roomId) {
+  const r = ROOMS[roomId];
+  const ox = r.x, oz = r.z;
+
+  const box = (w,h,d,mat,px,py,pz)=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
+    m.position.set(ox+px,py,oz+pz); m.castShadow=true; scene.add(m); return m;
+  };
+
+  if(roomId==='entrance_hall'){
+    // Chandelier
+    box(1.5,0.2,1.5,MAT.iron,0,3.8,0);
+    box(0.05,1.2,0.05,MAT.iron,0,3.2,0);
+    // Clock
+    const clk=box(0.5,2.0,0.3,MAT.wood,-4.5,1.0,-5);
+    clk.userData={interactable:true,id:'grandfather_clock',label:'Grandfather Clock'};
+    itemMeshes['grandfather_clock']=clk;
+    // Side table
+    box(0.8,0.8,0.4,MAT.wood,3,0.4,4);
+    box(0.05,0.8,0.05,MAT.wood,2.65,0.4,3.75);
+    box(0.05,0.8,0.05,MAT.wood,3.35,0.4,3.75);
+    box(0.05,0.8,0.05,MAT.wood,2.65,0.4,4.25);
+    box(0.05,0.8,0.05,MAT.wood,3.35,0.4,4.25);
+  }
+  if(roomId==='dining_room'){
+    // Table
+    box(5,0.1,1.5,MAT.wood,0,0.8,-0.5);
+    box(0.1,0.8,0.1,MAT.wood,-2.4,0.4,-1.2);
+    box(0.1,0.8,0.1,MAT.wood,2.4,0.4,-1.2);
+    box(0.1,0.8,0.1,MAT.wood,-2.4,0.4,0.2);
+    box(0.1,0.8,0.1,MAT.wood,2.4,0.4,0.2);
+    // Fireplace
+    box(2.5,2.2,0.3,MAT.stone,0,1.1,-4.7);
+    box(2.0,0.2,0.4,MAT.stone,0,0.1,-4.6);
+    // Portrait (interactable)
+    const portrait=box(1.5,2,0.05,MAT.red,0,2.5,-4.82);
+    portrait.userData={interactable:true,id:'portrait',label:'Examine Portrait'};
+    itemMeshes['portrait']=portrait;
+  }
+  if(roomId==='library'){
+    // Bookshelves lining walls
+    for(let i=-4;i<=4;i+=2){
+      box(1.8,3.5,0.4,MAT.book,i,1.75,5);
+      box(1.8,3.5,0.4,MAT.book,i,1.75,-5);
+    }
+    // Special bookshelf (north) — puzzle
+    const bsN=box(2,3.5,0.4,MAT.wood,0,1.75,5.1);
+    bsN.userData={interactable:true,id:'special_bookshelf',label:'Strange Bookshelf'};
+    itemMeshes['special_bookshelf']=bsN;
+    // Armchair
+    box(1.0,0.5,0.9,MAT.red,-3,0.25,2);
+    box(1.0,0.8,0.2,MAT.red,-3,0.65,2.45);
+    // Desk
+    box(1.8,0.1,0.8,MAT.wood,2,0.75,2);
+    box(0.08,0.75,0.08,MAT.wood,1.2,0.375,1.65);
+    box(0.08,0.75,0.08,MAT.wood,2.8,0.375,1.65);
+    box(0.08,0.75,0.08,MAT.wood,1.2,0.375,2.35);
+    box(0.08,0.75,0.08,MAT.wood,2.8,0.375,2.35);
+  }
+  if(roomId==='master_bedroom'){
+    // Four-poster bed
+    box(2,0.4,2.5,MAT.wood,0,0.2,-2);
+    box(0.1,2.5,0.1,MAT.wood,-0.95,1.25,-3.2);
+    box(0.1,2.5,0.1,MAT.wood,0.95,1.25,-3.2);
+    box(0.1,2.5,0.1,MAT.wood,-0.95,1.25,-0.8);
+    box(0.1,2.5,0.1,MAT.wood,0.95,1.25,-0.8);
+    // Vanity
+    box(1.2,0.8,0.4,MAT.wood,3.5,0.4,-0.5);
+    const mirror=box(1.0,1.5,0.05,MAT.glass,3.5,1.55,-0.7);
+    mirror.userData={interactable:true,id:'broken_mirror',label:'Shattered Mirror'};
+    itemMeshes['broken_mirror']=mirror;
+    // Wardrobe
+    const ward=box(1.4,2.4,0.6,MAT.wood,-3.5,1.2,-2);
+    ward.userData={interactable:true,id:'wardrobe',label:'Wardrobe'};
+    itemMeshes['wardrobe']=ward;
+  }
+  if(roomId==='bedroom2'){
+    box(0.9,0.3,1.8,MAT.wood,0,0.15,-2.5);
+    box(0.9,0.4,0.15,MAT.wood,0,0.5,-3.35);
+  }
+  if(roomId==='basement'){
+    // Workbench
+    box(2.5,0.1,0.8,MAT.wood,0,0.8,2);
+    box(0.1,0.8,0.1,MAT.wood,-1.15,0.4,1.65);
+    box(0.1,0.8,0.1,MAT.wood,1.15,0.4,1.65);
+    // Shackles (visual)
+    box(0.5,0.05,0.05,MAT.iron,-2,2.8,-2);
+    box(0.05,0.4,0.05,MAT.iron,-2.2,2.5,-2);
+    box(0.05,0.4,0.05,MAT.iron,-1.8,2.5,-2);
+  }
+  if(roomId==='attic'){
+    // Trunks and covered furniture
+    box(1.5,0.8,0.8,MAT.wood,-4,0.4,-4);
+    box(1.2,1.8,0.8,MAT.wallDk,3,0.9,3);
+    box(1.8,1.2,0.8,MAT.wallDk,-3,0.6,3);
+    box(0.8,0.8,0.8,MAT.wood,2,0.4,-3);
+    // Pentagram drawn on floor (darker patch)
+    box(3,0.01,3,MAT.blood,0,0.07,0);
+  }
+  if(roomId==='hidden_study'){
+    // Ritual circle
+    box(3,0.01,3,MAT.blood,0,0.07,0);
+    // Candles
+    const c1=box(0.06,0.3,0.06,MAT.candle,-1,0.16,0);
+    const c2=box(0.06,0.3,0.06,MAT.candle,0.5,0.16,0.9);
+    const c3=box(0.06,0.3,0.06,MAT.candle,0.5,0.16,-0.9);
+    // Bookcase with codex
+    box(2,2.5,0.4,MAT.book,0,1.25,3);
+    // Desk
+    box(1.6,0.1,0.7,MAT.wood,0,0.75,-2);
+  }
+}
+
+// ── Build World ───────────────────────────────────────────────────
+function buildWorld() {
+  Object.keys(ROOMS).forEach(id => {
+    buildRoomGeometry(id);
+    addFurniture(id);
+    placeItemMeshes(id);
+  });
+  buildMonster();
+}
+
+function placeItemMeshes(roomId) {
+  const r = ROOMS[roomId];
+  (r.items||[]).forEach((itemId,idx)=>{
+    const item = ITEMS[itemId];
+    if(!item || item.taken || item.hidden) return;
+    const geo = new THREE.BoxGeometry(0.18,0.18,0.18);
+    let mat = MAT.paper;
+    if(itemId.includes('key')) mat = itemId.includes('brass') ? MAT.brass : itemId.includes('gold') ? MAT.gold : MAT.iron;
+    if(itemId.includes('candle')) mat = MAT.candle;
+    if(itemId.includes('matches')) mat = MAT.wood;
+    if(itemId.includes('doll')) mat = MAT.doll;
+    if(itemId.includes('lantern')) mat = MAT.iron;
+    if(itemId.includes('codex')) mat = MAT.dark;
+    const mesh = new THREE.Mesh(geo, mat);
+    const ox = r.x + (idx%3-1)*0.5;
+    const oz = r.z + Math.floor(idx/3)*0.5 - 1;
+    mesh.position.set(ox, 0.5, oz);
+    mesh.userData = { interactable:true, id:itemId, label: item.name, type:'item' };
+    mesh.castShadow = true;
+    scene.add(mesh);
+    itemMeshes[itemId] = mesh;
+  });
+}
+
+function buildMonster() {
+  const group = new THREE.Group();
+  // Body — tall, thin
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.5,1.4,0.25), MAT.monster);
+  body.position.set(0,0.9,0);
+  // Head
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.35,0.35,0.3), MAT.monster);
+  head.position.set(0,1.75,0);
+  // Arms
+  const armL = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.1,0.12), MAT.monster);
+  armL.position.set(-0.35,0.8,0);
+  const armR = new THREE.Mesh(new THREE.BoxGeometry(0.12,1.1,0.12), MAT.monster);
+  armR.position.set(0.35,0.8,0);
+  // Eyes (dim red emissive)
+  const eyeMat = new THREE.MeshLambertMaterial({color:0x440000,emissive:0xff0000,emissiveIntensity:0.5});
+  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.05), eyeMat);
+  eyeL.position.set(-0.08,1.76,0.16);
+  const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.06,0.05), eyeMat);
+  eyeR.position.set(0.08,1.76,0.16);
+
+  group.add(body,head,armL,armR,eyeL,eyeR);
+  group.position.set(ROOMS.basement.x, 0, ROOMS.basement.z);
+  group.visible = false;
+  scene.add(group);
+  monsterMesh.obj = group;
+  monsterMesh.eyeMatL = eyeMat;
+  monsterMesh.eyeR = eyeR;
+}
+
+// ── Item placement helpers ────────────────────────────────────────
+function removeItemMesh(itemId) {
+  if(itemMeshes[itemId]) {
+    scene.remove(itemMeshes[itemId]);
+    delete itemMeshes[itemId];
+  }
+}
+
+// ── Log System ────────────────────────────────────────────────────
+const logEl = document.getElementById('log');
+const logLines = [];
+function addLog(msg, cls='') {
+  logLines.push(`<p class="${cls} new">${msg}</p>`);
+  if(logLines.length>8) logLines.shift();
+  logEl.innerHTML = logLines.join('');
+  // Remove 'new' class after brief flash
+  setTimeout(()=>{
+    logEl.querySelectorAll('.new').forEach(el=>el.classList.remove('new'));
+  }, 600);
+}
+
+// ── Inventory Display ─────────────────────────────────────────────
+function updateInvDisplay() {
+  const el = document.getElementById('inv-list');
+  if(GS.inventory.length===0){ el.innerHTML='— empty —'; return; }
+  el.innerHTML = GS.inventory.map(id=>{
+    const it=ITEMS[id]; return `<div>· ${it?it.name:id}</div>`;
+  }).join('');
+}
+
+// ── Sanity Display ────────────────────────────────────────────────
+function updateSanity(delta) {
+  GS.sanity = Math.max(0, Math.min(100, GS.sanity+delta));
+  document.getElementById('sanity-bar').style.width = GS.sanity+'%';
+  const bar = document.getElementById('sanity-bar');
+  if(GS.sanity>60) bar.style.background='linear-gradient(90deg,#005500,#00aa00)';
+  else if(GS.sanity>30) bar.style.background='linear-gradient(90deg,#554400,#aa8800)';
+  else bar.style.background='linear-gradient(90deg,#550000,#cc0000)';
+
+  if(GS.sanity<=0 && !GS.gameOver) triggerEnding('insanity');
+}
+
+// ── Interact Prompt ───────────────────────────────────────────────
+const promptEl = document.getElementById('prompt');
+function showPrompt(text) { promptEl.textContent=text; promptEl.style.opacity='1'; }
+function hidePrompt() { promptEl.style.opacity='0'; }
+
+// ── Raycasting (look-at detection) ───────────────────────────────
+const raycaster = new THREE.Raycaster();
+const centerVec = new THREE.Vector2(0,0);
+let lookTarget = null;
+
+function checkLookTarget() {
+  raycaster.setFromCamera(centerVec, camera);
+  const targets = Object.values(itemMeshes).filter(m=>m.userData.interactable);
+  const hits = raycaster.intersectObjects(targets, true);
+  if(hits.length>0 && hits[0].distance<3.5) {
+    const obj = hits[0].object;
+    const root = obj.userData.interactable ? obj : obj.parent;
+    if(root && root.userData.interactable) {
+      lookTarget = root;
+      showPrompt(`[E] ${root.userData.label}`);
+      return;
+    }
+  }
+  lookTarget = null;
+  hidePrompt();
+}
+
+// ── Enter Room ───────────────────────────────────────────────────
+function enterRoom(roomId) {
+  const prev = GS.currentRoom;
+  GS.currentRoom = roomId;
+  const r = ROOMS[roomId];
+  if(!r) return;
+
+  if(!GS.visitedRooms.has(roomId)) {
+    GS.visitedRooms.add(roomId);
+    // Show room description on first visit
+    addLog(`<b style="color:#e44">${r.name}</b>`);
+    const desc = (roomId==='basement' && GS.litBasement) ? r.descLit : r.desc;
+    // Split into two lines for readability
+    const words = desc.split(' ');
+    const mid = Math.floor(words.length/2);
+    addLog(words.slice(0,mid).join(' ')+'...');
+    addLog('...'+words.slice(mid).join(' '));
+  } else {
+    addLog(`You are in the <b style="color:#e44">${r.name}</b>.`);
+  }
+
+  // Sanity effects from dark rooms
+  if(r.dark && !GS.litBasement && roomId==='basement') {
+    updateSanity(-8);
+    addLog("The absolute darkness presses against your eyes. Your sanity frays.");
+  }
+  if(r.dark && roomId==='attic') {
+    updateSanity(-3);
+  }
+
+  // Teleport camera into room
+  camera.position.set(r.x, 1.7, r.z);
+}
+
+// ── Move Player Between Rooms ─────────────────────────────────────
+function tryMove(dir) {
+  const r = ROOMS[GS.currentRoom];
+  if(!r || !r.exits) return;
+  const targetId = r.exits[dir];
+  if(!targetId) { addLog("You cannot go that way."); return; }
+
+  // Check if locked
+  if(GS.lockedDoors[targetId]) {
+    const hint = (r.lockedDoors||{})[targetId];
+    addLog(hint ? hint.msg : `The way to ${ROOMS[targetId]?.name||targetId} is blocked.`);
+    playCreak();
+    return;
+  }
+  if(targetId==='library' && GS.lockedDoors['library']) {
+    addLog("The library door is locked. You need a brass key.");
+    playCreak();
+    return;
+  }
+  if(targetId==='hidden_study' && !GS.hiddenStudyRevealed) {
+    addLog("There is nothing in that direction.");
+    return;
+  }
+
+  playCreak();
+  enterRoom(targetId);
+}
+
+// ── Command Parser ────────────────────────────────────────────────
+const VERB_MAP = {
+  examine:['examine','look at','look','inspect','check','study','observe','see','read about','describe','x'],
+  take:['take','pick up','grab','get','collect','acquire'],
+  drop:['drop','leave','put down','discard'],
+  use:['use','apply','activate','combine','try'],
+  open:['open','unlock','enter','go through','pass through'],
+  close:['close','shut','lock'],
+  read:['read','peruse','scan','study'],
+  push:['push','pull','move','shift','press'],
+  inventory:['inventory','inv','i','items','bag','pockets','what do i have','what am i carrying'],
+  look:['look around','look','l','where am i','surroundings','around'],
+  go:['go','walk','move','head','travel','run','proceed'],
+  help:['help','?','commands','how','hint'],
+};
+
+function matchVerb(input) {
+  input = input.trim().toLowerCase();
+  for(const [verb, patterns] of Object.entries(VERB_MAP)) {
+    for(const p of patterns) {
+      if(input.startsWith(p)) {
+        const rest = input.slice(p.length).trim().replace(/^(the|a|an|at|to|with|on|into|in)\s+/,'').trim();
+        return { verb, rest };
+      }
+    }
+  }
+  // Check for direction keywords
+  const dirs = {north:'north',south:'south',east:'east',west:'west',up:'up',down:'down',
+    upstairs:'up',downstairs:'down',n:'north',s:'south',e:'east',w:'west',u:'up',d:'down'};
+  if(dirs[input]) return { verb:'go', rest:dirs[input] };
+  return null;
+}
+
+function findItemInRoom(name) {
+  const r = ROOMS[GS.currentRoom];
+  const n = name.toLowerCase();
+  // Check items in room
+  for(const itemId of (r.items||[])) {
+    const it = ITEMS[itemId];
+    if(!it || it.taken) continue;
+    if(it.name.toLowerCase().includes(n) || it.short.toLowerCase().includes(n) || itemId.includes(n.replace(/\s/g,'_'))) return it;
+  }
+  return null;
+}
+
+function findItemInInventory(name) {
+  const n = name.toLowerCase();
+  for(const itemId of GS.inventory) {
+    const it = ITEMS[itemId];
+    if(!it) continue;
+    if(it.name.toLowerCase().includes(n) || it.short.toLowerCase().includes(n) || itemId.includes(n.replace(/\s/g,'_'))) return it;
+  }
+  return null;
+}
+
+function parseUseOn(rest) {
+  // "brass key on library door" or "key on door"
+  const m = rest.match(/^(.+?)\s+on\s+(.+)$/);
+  if(m) return { item: m[1].trim(), target: m[2].trim() };
+  return { item: rest, target: null };
+}
+
+function handleCommand(input) {
+  if(!GS.started || GS.gameOver) return;
+  const parsed = matchVerb(input);
+  if(!parsed) {
+    addLog(`You mutter "${input}" to yourself. It doesn't help.`);
+    return;
+  }
+  const { verb, rest } = parsed;
+
+  if(verb==='inventory') {
+    if(GS.inventory.length===0) addLog("You carry nothing but dread.");
+    else addLog("You are carrying: " + GS.inventory.map(id=>ITEMS[id]?.name||id).join(', ')+'.');
+    return;
+  }
+
+  if(verb==='look') {
+    const r = ROOMS[GS.currentRoom];
+    const desc = (GS.currentRoom==='basement' && GS.litBasement) ? r.descLit : r.desc;
+    const words = desc.split(' ');
+    const mid = Math.floor(words.length/2);
+    addLog(`<b style="color:#e44">${r.name}</b>: ${words.slice(0,mid).join(' ')}...`);
+    addLog('...'+words.slice(mid).join(' '));
+    // List visible items
+    const visible = (r.items||[]).filter(id=>ITEMS[id]&&!ITEMS[id].taken);
+    if(visible.length>0) addLog("You see: "+visible.map(id=>ITEMS[id].name).join(', ')+'.');
+    return;
+  }
+
+  if(verb==='go') {
+    const dirMap = {north:'north',south:'south',east:'east',west:'west',up:'up',down:'down',
+      n:'north',s:'south',e:'east',w:'west',u:'up',d:'down',
+      upstairs:'up',downstairs:'down',
+      'dining room':'north','dining_room':'north',
+      'kitchen':'west','library':'east',
+      'entrance hall':'south','entrance_hall':'south',
+      'upstairs hallway':'up','upstairs_hallway':'up',
+      'attic':'up','basement':'down',
+      'servant quarters':'north','servant_quarters':'north',
+      'master bedroom':'east','master_bedroom':'east',
+      "child's bedroom":'west','bedroom2':'west',
+      'bathroom':'north','hidden study':'east','hidden_study':'east',
+      'grand staircase':'north','grand_staircase':'north',
+    };
+    const dir = dirMap[rest] || rest;
+    tryMove(dir);
+    return;
+  }
+
+  if(verb==='help') {
+    addLog("Commands: examine [thing], take [item], open [door], use [item] on [target], read [note], push [bookshelf], look around, inventory, go [direction/room].");
+    addLog("Directions: north, south, east, west, up, down.");
+    return;
+  }
+
+  if(verb==='examine' || verb==='read') {
+    if(!rest) { addLog("Examine what?"); return; }
+
+    // Special interactables
+    if(rest.includes('clock')||rest.includes('grandfather')) {
+      addLog("The grandfather clock stands frozen at 3:13. The pendulum has stopped. Behind it, taped to the back panel...");
+      if(!GS.inventory.includes('brass_key')) {
+        addLog("You find a <b style='color:#c90'>Brass Key</b> hidden behind the clock!");
+        ITEMS['brass_key'].taken = false;
+        ITEMS['brass_key'].room = null;
+        GS.inventory.push('brass_key');
+        updateInvDisplay();
+        updateSanity(2);
+      } else {
+        addLog("The space behind the clock is empty now.");
+      }
+      return;
+    }
+    if(rest.includes('portrait')||rest.includes('painting')) {
+      addLog("The patriarch's painted eyes follow you with uncanny precision. His expression is one of absolute terror, barely masked by a veneer of Victorian dignity. Someone has scratched into the frame: 'IT WAS ALREADY HERE BEFORE HE SUMMONED IT.'");
+      updateSanity(-2);
+      return;
+    }
+    if(rest.includes('mirror')) {
+      addLog("The mirror is shattered into seven pieces. In each shard you see a different reflection — not all of them are yours. One shard shows the room behind you, but with a tall dark figure standing there that isn't there when you turn around.");
+      updateSanity(-4);
+      playJumpScare();
+      return;
+    }
+    if(rest.includes('wardrobe')) {
+      addLog("You open the wardrobe. Inside, the clothes hang undisturbed — except for long scratches on the interior door, at about waist height. Child-height. Something was trapped in here, trying to get out.");
+      updateSanity(-3);
+      return;
+    }
+    if(rest.includes('bookshelf')||rest.includes('shelf')) {
+      if(GS.currentRoom==='library') {
+        addLog("The strange bookshelf has volumes arranged by colour. The torn note mentioned a sequence: red spine, black spine, white spine...");
+        addLog("Type 'push bookshelf' to attempt the sequence if you know it, or study the books more carefully.");
+      } else {
+        addLog("Dusty bookshelves line the walls. Most of the titles are in Latin.");
+      }
+      return;
+    }
+    if(rest.includes('doll')) {
+      addLog("The porcelain doll stares at you with those vacant grey eyes. You are absolutely certain it moved. Its head is now turned two inches further than it was. The name CLARA is embroidered on the dress.");
+      updateSanity(-5);
+      playWhisper();
+      return;
+    }
+    if(rest.includes('pentagram')||rest.includes('circle')||rest.includes('symbol')) {
+      addLog("The chalk pentagram is fresh. Someone — or something — drew this very recently. The symbols at each point are from the Ashwood Codex. You feel dizzy looking at the centre of it.");
+      updateSanity(-4);
+      return;
+    }
+    if(rest.includes('tub')||rest.includes('bath')) {
+      addLog("The black water in the tub is absolutely still. Not a ripple. You lean in to look closer — and something shifts in its depths. You step back quickly. The water is still again.");
+      updateSanity(-5);
+      playJumpScare();
+      return;
+    }
+
+    // Try items in room or inventory
+    const itRoom = findItemInRoom(rest);
+    const itInv  = findItemInInventory(rest);
+    const it = itRoom || itInv;
+    if(it) {
+      addLog(it.look);
+      if(it.id.includes('diary')) {
+        GS.diariesRead++;
+        updateSanity(2); // reading diaries steadies you slightly
+        if(GS.diariesRead >= 5) {
+          GS.hasReadAllDiaries = true;
+          addLog("You have read all of Lord Ashwood's diary entries. The full horror of what happened here becomes clear.");
+        }
+      }
+      return;
+    }
+    addLog(`You don't see any ${rest} here.`);
+    return;
+  }
+
+  if(verb==='take') {
+    if(!rest) { addLog("Take what?"); return; }
+    const it = findItemInRoom(rest);
+    if(!it) { addLog(`You don't see any ${rest} to take.`); return; }
+    if(!it.canTake) { addLog(`You can't take the ${it.name}.`); return; }
+    it.taken = true;
+    GS.inventory.push(it.id);
+    removeItemMesh(it.id);
+    updateInvDisplay();
+    addLog(`You take the <b>${it.name}</b>.`);
+    updateSanity(1);
+    return;
+  }
+
+  if(verb==='drop') {
+    if(!rest) { addLog("Drop what?"); return; }
+    const it = findItemInInventory(rest);
+    if(!it) { addLog(`You aren't carrying any ${rest}.`); return; }
+    GS.inventory = GS.inventory.filter(id=>id!==it.id);
+    it.taken = false;
+    it.room = GS.currentRoom;
+    ROOMS[GS.currentRoom].items.push(it.id);
+    updateInvDisplay();
+    addLog(`You drop the ${it.name}.`);
+    return;
+  }
+
+  if(verb==='push') {
+    if(!rest) { addLog("Push what?"); return; }
+    if((rest.includes('bookshelf')||rest.includes('shelf')||rest.includes('books'))) {
+      if(GS.currentRoom !== 'library') { addLog("There's nothing here to push."); return; }
+      if(GS.bookselfSolved) { addLog("The passage is already open behind the bookshelf."); return; }
+      addLog("You pull the red spine... then the black spine... then the white spine.");
+      setTimeout(()=>{
+        addLog("With a grinding of ancient stone, the bookshelf swings inward, revealing a dark passage!");
+        GS.bookselfSolved = true;
+        GS.hiddenStudyRevealed = true;
+        ROOMS.library.exits.east = 'hidden_study';
+        GS.lockedDoors['hidden_study'] = false;
+        playDoorSlam();
+        playWhisper();
+        updateSanity(-5);
+      }, 1200);
+      return;
+    }
+    addLog(`You push the ${rest}. Nothing happens.`);
+    return;
+  }
+
+  if(verb==='open') {
+    if(!rest) { addLog("Open what?"); return; }
+    // Front door / exit
+    if(rest.includes('front door')||rest.includes('front')||rest.includes('exit')||rest.includes('main door')) {
+      if(GS.inventory.includes('golden_key')) {
+        addLog("You insert the golden key into the lock. It turns with a resonant CLICK.");
+        setTimeout(()=>triggerEnding('escape'), 1500);
+      } else {
+        addLog("The ornate golden lock holds fast. You need the golden key to open this door.");
+        playCreak();
+      }
+      return;
+    }
+    // Library door
+    if(rest.includes('library')) {
+      if(GS.inventory.includes('brass_key') && GS.lockedDoors['library']) {
+        GS.lockedDoors['library'] = false;
+        addLog("You use the brass key on the library door. It opens with a dry creak.");
+        playCreak();
+      } else if(!GS.lockedDoors['library']) {
+        addLog("The library door is already unlocked.");
+      } else {
+        addLog("The library door is locked. You need a brass key.");
+      }
+      return;
+    }
+    // Servant quarters
+    if(rest.includes('servant')||rest.includes('quarters')) {
+      if(GS.inventory.includes('iron_key') && GS.lockedDoors['servant_quarters']) {
+        GS.lockedDoors['servant_quarters'] = false;
+        addLog("You use the iron key on the servant quarters padlock. It falls away.");
+        playCreak();
+      } else if(!GS.lockedDoors['servant_quarters']) {
+        addLog("The servant quarters door is already unlocked.");
+      } else {
+        addLog("A heavy padlock blocks the servant quarters. You need an iron key.");
+      }
+      return;
+    }
+    addLog(`You try to open the ${rest}, but it won't budge — or there's nothing to open.`);
+    return;
+  }
+
+  if(verb==='use') {
+    const {item: itemName, target} = parseUseOn(rest);
+    if(!itemName) { addLog("Use what?"); return; }
+    const it = findItemInInventory(itemName);
+    if(!it) { addLog(`You don't have any ${itemName}.`); return; }
+
+    // Candle + matches
+    if((it.id==='candle'||it.id==='matches') && (target&&(target.includes('candle')||target.includes('match')||target.includes('lantern')))) {
+      if(GS.inventory.includes('candle') && GS.inventory.includes('matches')) {
+        addLog("You strike a match and light the candle. A warm, unsteady flame pushes back the dark.");
+        GS.litBasement = true;
+        playCreak();
+        updateSanity(5);
+        // Update basement light
+        const bl = new THREE.PointLight(0x553311, 0.8, 10);
+        bl.position.set(ROOMS.basement.x, 2, ROOMS.basement.z);
+        scene.add(bl);
+        roomLights['basement'].push(bl);
+        if(GS.currentRoom==='basement') addLog(ROOMS.basement.descLit);
+      } else {
+        addLog("You need both a candle and matches to do this.");
+      }
+      return;
+    }
+    // Lantern + matches
+    if((it.id==='lantern'||it.id==='matches') && target&&target.includes('lantern')) {
+      if(GS.inventory.includes('lantern') && GS.inventory.includes('matches')) {
+        addLog("You light the oil lantern. Its steady golden light is a comfort in this dark place.");
+        GS.litBasement = true;
+        updateSanity(8);
+        const bl = new THREE.PointLight(0x664422, 1.0, 12);
+        bl.position.set(ROOMS.basement.x, 2, ROOMS.basement.z);
+        scene.add(bl);
+        roomLights['basement'].push(bl);
+      } else {
+        addLog("You need both the lantern and matches.");
+      }
+      return;
+    }
+    // Keys on doors
+    if(it.id==='brass_key' && target&&(target.includes('library')||target.includes('door'))) {
+      if(GS.lockedDoors['library']) {
+        GS.lockedDoors['library'] = false;
+        addLog("You insert the brass key into the library door lock. It turns smoothly.");
+        playCreak();
+      } else addLog("The library door is already open.");
+      return;
+    }
+    if(it.id==='iron_key' && target&&(target.includes('servant')||target.includes('door')||target.includes('quarters'))) {
+      if(GS.lockedDoors['servant_quarters']) {
+        GS.lockedDoors['servant_quarters'] = false;
+        addLog("You use the iron key. The padlock springs open.");
+        playCreak();
+      } else addLog("The servant quarters are already unlocked.");
+      return;
+    }
+    if(it.id==='golden_key' && target&&(target.includes('front')||target.includes('door')||target.includes('exit'))) {
+      addLog("You insert the golden key into the ornate lock of the front door...");
+      setTimeout(()=>triggerEnding('escape'), 1500);
+      return;
+    }
+
+    addLog(`You use the ${it.name}, but nothing happens.`);
+    return;
+  }
+
+  addLog(`You're not sure how to "${input}". Try 'help' for commands.`);
+}
+
+// ── Monster AI ────────────────────────────────────────────────────
+const MONSTER_PATROL = [
+  'basement','servant_quarters','kitchen','entrance_hall',
+  'grand_staircase','upstairs_hallway','master_bedroom',
+  'bedroom2','bathroom','attic','dining_room','library','hidden_study'
+];
+let patrolIdx = 0;
+
+function updateMonster(dt) {
+  if(!GS.started || GS.gameOver) return;
+  const m = monsterMesh.obj;
+  if(!m) return;
+
+  // Animate
+  m.rotation.y += 0.8*dt;
+  const t = performance.now()/1000;
+  m.position.y = Math.sin(t*1.2)*0.05;
+
+  GS.monsterTimer += dt;
+  const interval = GS.monsterChasing ? 3 : Math.max(8, 25-GS.gameTime/60);
+
+  if(GS.monsterTimer >= interval) {
+    GS.monsterTimer = 0;
+    // Move monster
+    if(GS.monsterChasing) {
+      // Chase player — move to player's room
+      GS.monsterRoom = GS.currentRoom;
+    } else {
+      // Patrol
+      patrolIdx = (patrolIdx+1) % MONSTER_PATROL.length;
+      GS.monsterRoom = MONSTER_PATROL[patrolIdx];
+    }
+    const r = ROOMS[GS.monsterRoom];
+    if(r) {
+      m.position.set(r.x + (Math.random()-0.5)*3, 0, r.z + (Math.random()-0.5)*3);
+      m.visible = (GS.monsterRoom === GS.currentRoom);
+    }
+  }
+
+  // Is monster in same room as player?
+  if(GS.monsterRoom === GS.currentRoom) {
+    m.visible = true;
+    updateSanity(-0.15);
+    GS.monsterChasing = true;
+
+    // Distance check
+    const dx = m.position.x - camera.position.x;
+    const dz = m.position.z - camera.position.z;
+    const dist = Math.sqrt(dx*dx+dz*dz);
+
+    if(dist < 1.5) {
+      // Caught!
+      GS.monsterCatchTimer += dt;
+      if(GS.monsterCatchTimer > 0.8) {
+        GS.monsterCatchTimer = 0;
+        monsterCatch();
+      }
+    } else {
+      GS.monsterCatchTimer = 0;
+      // Move monster toward player
+      const spd = Math.min(2.5+GS.gameTime/120, 5) * dt;
+      const len = Math.sqrt(dx*dx+dz*dz);
+      m.position.x -= (dx/len)*spd;
+      m.position.z -= (dz/len)*spd;
+    }
+  } else {
+    m.visible = false;
+    if(GS.monsterRoom !== GS.currentRoom) GS.monsterChasing = false;
+  }
+}
+
+function monsterCatch() {
+  GS.deaths++;
+  playJumpScare();
+  flashBlood();
+  updateSanity(-20);
+  addLog("IT HAS YOU. Cold fingers close around your throat... then release. It savours the fear.");
+  if(GS.deaths >= 3) {
+    setTimeout(()=>triggerEnding('death'), 1500);
+  } else {
+    addLog(`You have been caught ${GS.deaths} time${GS.deaths>1?'s':''}. On the third catch, it will end you.`);
+    // Push monster away
+    const r = ROOMS['entrance_hall'];
+    GS.monsterRoom = 'basement';
+    const mr = ROOMS['basement'];
+    monsterMesh.obj.position.set(mr.x, 0, mr.z);
+    monsterMesh.obj.visible = false;
+    GS.monsterChasing = false;
+    // Teleport player to entrance
+    camera.position.set(r.x, 1.7, r.z);
+    GS.currentRoom = 'entrance_hall';
+  }
+}
+
+// ── Flicker & Horror Effects ──────────────────────────────────────
+const flickerEl = document.getElementById('flicker');
+const bloodEl   = document.getElementById('blood');
+const noiseEl   = document.getElementById('noise');
+
+function flashBlood() {
+  bloodEl.style.background='rgba(120,0,0,0.5)';
+  setTimeout(()=>bloodEl.style.background='rgba(120,0,0,0)',600);
+}
+
+function flickerLights(roomId) {
+  const lights = roomLights[roomId]||[];
+  lights.forEach(l=>{
+    const flk = 0.7+Math.random()*0.6;
+    l.intensity = l._baseInt * flk;
+  });
+  // Screen flicker
+  if(Math.random()<0.3) {
+    flickerEl.style.background=`rgba(0,0,0,${Math.random()*0.3})`;
+    setTimeout(()=>flickerEl.style.background='rgba(0,0,0,0)',80);
+  }
+}
+
+function updateHorrorEffects(dt) {
+  GS.flickerTimer -= dt;
+  if(GS.flickerTimer <= 0) {
+    GS.flickerTimer = 0.08+Math.random()*0.12;
+    flickerLights(GS.currentRoom);
+  }
+
+  // Noise / hallucination at low sanity
+  if(GS.sanity < 30) {
+    noiseEl.style.opacity = (0.05 + (30-GS.sanity)/300).toFixed(3);
+    if(Math.random()<0.002) {
+      // Hallucination — phantom figure
+      addLog("...something stands in the corner, but when you look directly at it, it's gone...");
+      updateSanity(-2);
+    }
+  } else {
+    noiseEl.style.opacity = '0';
+  }
+
+  // Camera shake near monster
+  if(GS.monsterRoom===GS.currentRoom && GS.sanity < 50) {
+    document.getElementById('ui').classList.add('shaking');
+  } else {
+    document.getElementById('ui').classList.remove('shaking');
+  }
+
+  // Whispers
+  GS.whisperTimer -= dt;
+  if(GS.whisperTimer <= 0) {
+    GS.whisperTimer = 20+Math.random()*40;
+    if(GS.sanity < 60) playWhisper();
+    if(GS.sanity < 30 && Math.random()<0.4) {
+      const msgs = [
+        "...you should not be here...",
+        "...we have been waiting...",
+        "...it knows your name...",
+        "...there is no escape...",
+        "...join us... join us...",
+        "...it wears your face now...",
+      ];
+      addLog(`<i style="color:#733">${msgs[Math.floor(Math.random()*msgs.length)]}</i>`);
+    }
+  }
+
+  // Footsteps
+  GS.footstepTimer -= dt;
+  if(GS.footstepTimer <= 0) {
+    GS.footstepTimer = 0.5;
+    const dp = camera.position.distanceTo(GS.lastPos);
+    if(dp > 0.05) { playFootstep(); GS.lastPos.copy(camera.position); }
+  }
+
+  // Heartbeat at low sanity
+  if(GS.sanity < 30 && !GS.heartbeatPlaying && audioCtx) {
+    GS.heartbeatPlaying = true;
+    if(sounds.heartbeatBuf) {
+      GS.heartbeatNode = playBuffer(sounds.heartbeatBuf, 0.6, true);
+    }
+  } else if(GS.sanity >= 30 && GS.heartbeatPlaying) {
+    GS.heartbeatPlaying = false;
+    if(GS.heartbeatNode) { try { GS.heartbeatNode.src.stop(); } catch(e){} GS.heartbeatNode=null; }
+  }
+
+  // Random door slam
+  if(Math.random()<0.0003) {
+    addLog("A distant door SLAMS shut somewhere in the house.");
+    playDoorSlam();
+  }
+  // Random child laughter
+  if(GS.sanity < 50 && Math.random()<0.0002) {
+    addLog("You hear a child's laughter echoing through the walls...");
+    playChildLaughter();
+    updateSanity(-3);
+  }
+}
+
+// ── Endings ───────────────────────────────────────────────────────
+function triggerEnding(type) {
+  if(GS.gameOver) return;
+  GS.gameOver = true;
+  controls.unlock();
+  const titles = {
+    escape:'YOU ESCAPE',
+    death:'YOU ARE DEAD',
+    insanity:'LOST TO MADNESS',
+    hidden:'DAWN BREAKS'
+  };
+  const msgs = {
+    escape: `You burst through the front door of Ashwood Manor into the cold pre-dawn air. Rain lashes your face. You run down the gravel drive without looking back.<br><br>
+    Behind you, the manor stands dark and silent. But as you reach the gate, you pause — was that a face at the attic window? Pale. Still. Watching.<br><br>
+    You keep running.<br><br>
+    The entity remains. It will wait. It is very good at waiting.<br><br>
+    <i>ENDING: THE SURVIVOR — You escaped with your life, your sanity ${GS.sanity>50?'mostly intact':'fraying at the edges'}. The truth of the Ashwood family is known only to you.</i>`,
+
+    death: `The entity closes around you for the third time, and this time it does not let go.<br><br>
+    You feel something drain from you — not blood, not heat, but something more fundamental. Your face. Your name. The memory of who you were.<br><br>
+    In the morning, the locals will say they saw a new figure walking the halls of Ashwood Manor. Tall. Dark. With your eyes.<br><br>
+    <i>ENDING: CONSUMED — The entity has a new face. You are Ashwood Manor now. Forever.</i>`,
+
+    insanity: `The darkness behind your eyes finally wins.<br><br>
+    You sit down in ${ROOMS[GS.currentRoom]?.name||'a room'} and do not get up. The lines between real and unreal dissolve entirely. The entity walks past you twice, but doesn't touch you — it has no use for someone already broken.<br><br>
+    They find you three weeks later, still sitting. Still breathing. Drawing on the floor with your finger, over and over: a name you don't recognise. CLARA. CLARA. CLARA.<br><br>
+    <i>ENDING: THE BROKEN — Your body survives. What was inside you did not.</i>`,
+
+    hidden: `You have read every word Lord Ashwood left behind. You understand the ritual. You understand the cost.<br><br>
+    As the first grey light of dawn creeps through the attic window, you make a choice.<br><br>
+    You speak the words from the Codex. The entity screams — a sound like grief given form — and it unravels. The manor shudders. And then stillness.<br><br>
+    You are still there when the sun rises. Someone must tend to this house now. Someone must be the keeper. But the darkness is gone, and the family is at rest, and Clara — wherever she is — is finally, finally free.<br><br>
+    <i>HIDDEN ENDING: THE KEEPER — You sacrificed your freedom to end the horror forever. The highest price. The only victory.</i>`
+  };
+
+  const screen = document.getElementById('endscreen');
+  document.getElementById('end-title').innerHTML = titles[type]||'THE END';
+  document.getElementById('end-msg').innerHTML = msgs[type]||'The manor keeps its secrets.';
+  screen.style.display='flex';
+  if(audioCtx) sounds.masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime+3);
+}
+
+// ── Timer display ─────────────────────────────────────────────────
+function updateTimer() {
+  const elapsed = Math.floor(GS.gameTime);
+  const m = Math.floor(elapsed/60);
+  const s = elapsed%60;
+  document.getElementById('timer').textContent =
+    `TIME: ${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// ── Hidden ending check ───────────────────────────────────────────
+function checkHiddenEnding() {
+  if(GS.hasReadAllDiaries && GS.visitedRooms.has('hidden_study') && GS.inventory.includes('ashwood_codex') && GS.gameTime > 120) {
+    if(Math.random() < 0.0005) {
+      addLog("You feel a sudden clarity. Dawn is near. You could end this — truly end it.");
+      addLog("Type 'read codex' and speak the words, or use the golden key on the front door to escape.");
+    }
+  }
+}
+
+// ── WASD Movement ─────────────────────────────────────────────────
+const keys = {};
+document.addEventListener('keydown', e=>{
+  keys[e.code]=true;
+  if(e.code==='KeyE') handleEInteract();
+});
+document.addEventListener('keyup', e=>{ keys[e.code]=false; });
+
+function handleEInteract() {
+  if(!GS.started||GS.gameOver) return;
+  if(lookTarget) {
+    const ud = lookTarget.userData;
+    if(ud.type==='item') {
+      const it = ITEMS[ud.id];
+      if(it) { addLog(it.look); if(it.canTake && !it.taken) addLog(`Type 'take ${it.short}' to pick it up.`); }
+    } else {
+      handleCommand('examine '+ud.id.replace(/_/g,' '));
+    }
+  } else {
+    handleCommand('look around');
+  }
+}
+
+let prevTime = performance.now();
+const moveSpeed = 5;
+
+function handleMovement(dt) {
+  if(!controls.isLocked || !GS.started || GS.gameOver) return;
+  if(keys['KeyW']||keys['ArrowUp'])    controls.forward(-moveSpeed*dt);
+  if(keys['KeyS']||keys['ArrowDown'])  controls.forward( moveSpeed*dt);
+  if(keys['KeyA']||keys['ArrowLeft'])  controls.right(-moveSpeed*dt);
+  if(keys['KeyD']||keys['ArrowRight']) controls.right( moveSpeed*dt);
+
+  // Clamp to rough room bounds + y
+  camera.position.y = 1.7;
+  const r = ROOMS[GS.currentRoom];
+  if(r) {
+    camera.position.x = Math.max(r.x-r.w/2+0.5, Math.min(r.x+r.w/2-0.5, camera.position.x));
+    camera.position.z = Math.max(r.z-r.d/2+0.5, Math.min(r.z+r.d/2-0.5, camera.position.z));
+  }
+}
+
+// ── Room Detection (auto-enter adjacent rooms) ────────────────────
+function detectRoomChange() {
+  // Check if player has walked far enough toward an exit
+  const pos = camera.position;
+  const cr = ROOMS[GS.currentRoom];
+  if(!cr) return;
+  const margin = 1.0;
+  // North exit
+  if(cr.exits?.north && pos.z < cr.z - cr.d/2 + margin) tryMove('north');
+  // South
+  else if(cr.exits?.south && pos.z > cr.z + cr.d/2 - margin) tryMove('south');
+  // East
+  else if(cr.exits?.east && pos.x > cr.x + cr.w/2 - margin) tryMove('east');
+  // West
+  else if(cr.exits?.west && pos.x < cr.x - cr.w/2 + margin) tryMove('west');
+}
+
+// ── Main Game Loop ────────────────────────────────────────────────
+function animate() {
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  const dt = Math.min((now - prevTime)/1000, 0.05);
+  prevTime = now;
+
+  if(!GS.started || GS.gameOver) { renderer.render(scene,camera); return; }
+
+  GS.gameTime += dt;
+  handleMovement(dt);
+  detectRoomChange();
+  checkLookTarget();
+  updateMonster(dt);
+  updateHorrorEffects(dt);
+  checkHiddenEnding();
+  updateTimer();
+
+  // Passive sanity drain in very dark rooms
+  if(ROOMS[GS.currentRoom]?.dark) updateSanity(-0.01);
+
+  renderer.render(scene, camera);
+}
+
+// ── Start Game ────────────────────────────────────────────────────
+document.getElementById('start-btn').addEventListener('click', ()=>{
+  initAudio();
+  buildWorld();
+  buildAmbient();
+  buildHeartbeat();
+  document.getElementById('start').style.display='none';
+  GS.started = true;
+  GS.startTime = performance.now();
+  enterRoom('entrance_hall');
+  addLog("You awaken in the entrance hall. The front door is locked behind you.");
+  addLog("Type 'look around' to examine your surroundings. Type 'help' for commands.");
+  canvas.addEventListener('click', ()=>controls.lock());
+  controls.lock();
+});
+
+// Command input
+const cmdEl = document.getElementById('cmd');
+cmdEl.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    const val = cmdEl.value.trim();
+    if(val) {
+      addLog(`<span style="color:#866">> ${val}</span>`);
+      handleCommand(val);
+      cmdEl.value='';
+    }
+    e.preventDefault();
+  }
+  e.stopPropagation();
+});
+cmdEl.addEventListener('click', e=>e.stopPropagation());
+cmdEl.addEventListener('focus', ()=>{ if(controls.isLocked) controls.unlock(); });
+
+// Prevent game keys from firing while typing
+['keydown','keyup'].forEach(ev=>
+  cmdEl.addEventListener(ev, e=>e.stopPropagation())
+);
+
+animate();
+</script>
+</body>
+</html>
