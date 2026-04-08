@@ -123,7 +123,7 @@
 <div id="start">
   <h1>SHADOWED ECHOES</h1>
   <div class="subtitle">A Victorian Horror Experience</div>
-  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.8</div>
+  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.9</div>
   <div class="story">
     You awaken on the cold stone floor of Ashwood Manor, your memory a shredded ruin.
     Rain hammers the shuttered windows. The grandfather clock in the hall has stopped at 3:13 AM.
@@ -1755,7 +1755,13 @@ document.addEventListener('keydown', e=>{
     return;
   }
 
-  // Look mode — printable char or Enter opens command input
+  // Look mode — game keys handled first, everything else opens command input
+  const GAME_CODES = new Set(['KeyW','KeyA','KeyS','KeyD','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight']);
+  if(GAME_CODES.has(e.code)) {
+    keys[e.code] = true;
+    if(e.code === 'KeyE') handleEInteract();
+    return;
+  }
   if(e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
     enterCommandMode(e.key); return;
   }
