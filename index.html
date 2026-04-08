@@ -1050,7 +1050,8 @@ const VERB_MAP = {
   inventory:['inventory','inv','i','items','bag','pockets','what do i have','what am i carrying'],
   look:['look around','look','l','where am i','surroundings','around'],
   go:['go','walk','move','head','travel','run','proceed'],
-  help:['help','?','commands','how','hint'],
+  help:['help','?','commands','how'],
+  hint:['hint','clue','stuck','help me','what do i do','what now','where do i go'],
 };
 
 function matchVerb(input) {
@@ -1149,7 +1150,49 @@ function handleCommand(input) {
 
   if(verb==='help') {
     addLog("Commands: examine [thing], take [item], open [door], use [item] on [target], read [note], push [bookshelf], look around, inventory, go [direction/room].");
-    addLog("Directions: north, south, east, west, up, down.");
+    addLog("Directions: north, south, east, west, up, down. Type 'hint' for a contextual clue.");
+    return;
+  }
+
+  if(verb==='hint') {
+    const inv = GS.inventory;
+    const visited = GS.visitedRooms;
+    // Work through the puzzle chain in priority order
+    if(inv.includes('golden_key')) {
+      addLog("HINT: You have the golden key. Return to the entrance hall and use it on the front door to escape.");
+    } else if(!visited.has('attic')) {
+      addLog("HINT: The golden key is hidden somewhere high up. Find your way to the upper floors.");
+    } else if(!inv.includes('golden_key')) {
+      addLog("HINT: Search the attic carefully — something glints among the old trunks and rafters. Try 'take golden key'.");
+    } else if(!GS.hiddenStudyRevealed && visited.has('library')) {
+      addLog("HINT: In the library, one bookshelf looks different from the others. Push it — but you'll need to know the sequence first. Check the master bedroom for a torn note.");
+    } else if(!GS.hiddenStudyRevealed && !visited.has('library')) {
+      if(!inv.includes('brass_key')) {
+        addLog("HINT: The library is locked. A brass key is hidden somewhere in the entrance hall — examine the grandfather clock.");
+      } else {
+        addLog("HINT: You have the brass key. Use it on the library door (go east from the entrance hall).");
+      }
+    } else if(!inv.includes('brass_key') && GS.lockedDoors['library']) {
+      addLog("HINT: The library door needs a brass key. Examine the grandfather clock in the entrance hall — something is hidden behind it.");
+    } else if(GS.lockedDoors['library'] && inv.includes('brass_key')) {
+      addLog("HINT: Use the brass key on the library door: type 'use brass key on library door'.");
+    } else if(GS.lockedDoors['servant_quarters'] && !inv.includes('iron_key')) {
+      addLog("HINT: The servant quarters are padlocked. An iron key was left behind in the kitchen.");
+    } else if(GS.lockedDoors['servant_quarters'] && inv.includes('iron_key')) {
+      addLog("HINT: Use the iron key on the servant quarters: type 'use iron key on servant quarters'.");
+    } else if(!GS.litBasement && !inv.includes('matches') && !inv.includes('candle')) {
+      addLog("HINT: The basement is pitch black — you need a light source. A candle sits in the dining room and matches are in the kitchen.");
+    } else if(!GS.litBasement && (!inv.includes('matches') || !inv.includes('candle'))) {
+      const missing = !inv.includes('matches') ? 'matches (kitchen)' : 'a candle (dining room)';
+      addLog(`HINT: You need both a candle and matches to make a light. You're still missing: ${missing}.`);
+    } else if(!GS.litBasement && inv.includes('matches') && inv.includes('candle')) {
+      addLog("HINT: You have matches and a candle. Type 'use matches on candle' to light it, then head to the basement.");
+    } else if(GS.diariesRead < 5) {
+      const found = ['diary_page_1','diary_page_2','diary_page_3','diary_page_4','diary_page_5'].filter(id=>inv.includes(id)||ITEMS[id]?.taken);
+      addLog(`HINT: You have read ${GS.diariesRead}/5 diary pages. They reveal Lord Ashwood's secrets and are needed for the hidden ending. Explore every room.`);
+    } else {
+      addLog("HINT: Explore every room — there are 13 in total. Read everything you find. The truth is in the details.");
+    }
     return;
   }
 
