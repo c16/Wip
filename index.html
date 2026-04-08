@@ -92,6 +92,7 @@
   #endscreen button{font-family:'Creepster',cursive;font-size:18px;color:#c00;background:transparent;border:1px solid #600;padding:10px 30px;cursor:pointer;letter-spacing:2px;pointer-events:all}
   #endscreen button:hover{background:#200}
 
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
   @keyframes flicker-text{0%,100%{opacity:1}92%{opacity:1}93%{opacity:.4}95%{opacity:1}97%{opacity:.2}98%{opacity:1}}
   @keyframes shake{0%,100%{transform:translate(0,0)}25%{transform:translate(-4px,2px)}50%{transform:translate(4px,-2px)}75%{transform:translate(-2px,4px)}}
   .shaking{animation:shake .15s infinite}
@@ -115,14 +116,14 @@
   <div id="log-wrap"><div id="log"></div></div>
   <div id="cmd-wrap">
     <span id="mode-badge" style="font-size:10px;letter-spacing:1px;color:#500;margin-right:10px;flex-shrink:0;text-transform:uppercase">LOOK</span>
-    <span>&gt;_</span>
-    <input id="cmd" type="text" placeholder="just start typing, or press Enter..." autocomplete="off" spellcheck="false">
+    <span style="color:#600;margin-right:8px;font-size:13px;flex-shrink:0">&gt;_</span>
+    <span id="cmd-display" style="flex:1;color:#e88;font-family:'Special Elite',cursive;font-size:13px;min-height:1em"></span><span id="cmd-cursor" style="color:#c00;display:none">█</span>
   </div>
 </div>
 <div id="start">
   <h1>SHADOWED ECHOES</h1>
   <div class="subtitle">A Victorian Horror Experience</div>
-  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.4</div>
+  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.8</div>
   <div class="story">
     You awaken on the cold stone floor of Ashwood Manor, your memory a shredded ruin.
     Rain hammers the shuttered windows. The grandfather clock in the hall has stopped at 3:13 AM.
@@ -1693,43 +1694,74 @@ function checkHiddenEnding() {
   }
 }
 
-// ── WASD Movement ─────────────────────────────────────────────────
-const keys = {};
-let commandMode = false;   // true while the text input is active
+// ── Virtual Command Input (no HTML focus needed — works with pointer lock) ──
+const cmdDisplay = document.getElementById('cmd-display');
+const cmdCursor  = document.getElementById('cmd-cursor');
+let cmdBuffer = '';
+let commandMode = false;
+
+function renderCmdBuffer() {
+  cmdDisplay.textContent = cmdBuffer;
+}
 
 function enterCommandMode(initialChar) {
   if(commandMode) return;
   commandMode = true;
-  window._cmdMode = true;   // pause mouse-look without dropping pointer lock
+  window._cmdMode = true;
   modeBadge.textContent='TYPE'; modeBadge.style.color='#a44';
   document.getElementById('xhair').style.opacity='0.4';
-  if(initialChar) cmdEl.value += initialChar;
-  cmdEl.focus();
+  cmdCursor.style.display='inline';
+  cmdCursor.style.animation='blink 1s infinite';
+  if(initialChar) { cmdBuffer += initialChar; renderCmdBuffer(); }
 }
 
 function exitCommandMode() {
   if(!commandMode) return;
   commandMode = false;
   window._cmdMode = false;
+  cmdBuffer = '';
+  renderCmdBuffer();
+  cmdCursor.style.display='none';
   modeBadge.textContent='LOOK'; modeBadge.style.color='#500';
   document.getElementById('xhair').style.opacity='1';
-  cmdEl.blur();
-  // Pointer lock is never released so no re-lock needed — paint is unblocked
+  // Pointer lock stays active throughout — no requestPointerLock() needed
 }
+
+// ── WASD Movement ─────────────────────────────────────────────────
+const keys = {};
 
 document.addEventListener('keydown', e=>{
   if(!GS.started || GS.gameOver) return;
-  // Don't intercept while command input is active
-  if(commandMode) return;
-  // Any printable character → switch to command mode with that char
-  if(e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-    enterCommandMode(e.key);
+
+  if(commandMode) {
+    // Route all keys to our virtual input buffer
+    if(e.key === 'Enter') {
+      const val = cmdBuffer.trim();
+      exitCommandMode();
+      if(val) {
+        addLog(`<span style="color:#866">> ${val}</span>`);
+        handleCommand(val);
+      }
+    } else if(e.key === 'Backspace') {
+      cmdBuffer = cmdBuffer.slice(0, -1);
+      renderCmdBuffer();
+    } else if(e.key === 'Escape') {
+      exitCommandMode();
+    } else if(e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      cmdBuffer += e.key;
+      renderCmdBuffer();
+    }
+    e.preventDefault();
     return;
   }
-  // Enter → open command input empty
+
+  // Look mode — printable char or Enter opens command input
+  if(e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    enterCommandMode(e.key); return;
+  }
   if(e.code === 'Enter') { enterCommandMode(); return; }
-  keys[e.code]=true;
-  if(e.code==='KeyE') handleEInteract();
+  keys[e.code] = true;
+  if(e.code === 'KeyE') handleEInteract();
 });
 document.addEventListener('keyup', e=>{ keys[e.code]=false; });
 
@@ -1825,29 +1857,8 @@ document.getElementById('start-btn').addEventListener('click', ()=>{
   controls.lock();
 });
 
-// Command input
-const cmdEl = document.getElementById('cmd');
-cmdEl.addEventListener('keydown', e=>{
-  if(e.key==='Enter'){
-    const val = cmdEl.value.trim();
-    cmdEl.value = '';
-    if(val) {
-      addLog(`<span style="color:#866">> ${val}</span>`);
-      handleCommand(val);
-    }
-    exitCommandMode();
-    e.preventDefault();
-  } else if(e.key==='Escape') {
-    cmdEl.value = '';
-    exitCommandMode();
-  }
-  e.stopPropagation();
-});
-cmdEl.addEventListener('click', e=>{ e.stopPropagation(); enterCommandMode(); });
-// Prevent game keys from firing while typing
-['keydown','keyup'].forEach(ev=>
-  cmdEl.addEventListener(ev, e=>e.stopPropagation())
-);
+// Click cmd-wrap area to enter command mode
+document.getElementById('cmd-wrap').addEventListener('click', ()=>{ if(GS.started && !GS.gameOver) enterCommandMode(); });
 
 animate();
 </script>
