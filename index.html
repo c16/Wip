@@ -115,8 +115,9 @@
   <div id="prompt"></div>
   <div id="log-wrap"><div id="log"></div></div>
   <div id="cmd-wrap">
+    <span id="mode-badge" style="font-size:10px;letter-spacing:1px;color:#500;margin-right:10px;flex-shrink:0;text-transform:uppercase">LOOK</span>
     <span>&gt;_</span>
-    <input id="cmd" type="text" placeholder="type a command..." autocomplete="off" spellcheck="false">
+    <input id="cmd" type="text" placeholder="just start typing, or press Enter..." autocomplete="off" spellcheck="false">
   </div>
 </div>
 <div id="start">
@@ -139,6 +140,8 @@
     Click canvas — Lock cursor<br>
     ESC — Release cursor<br>
     E — Examine / Interact<br>
+    Enter — Switch to type mode<br>
+    ESC — Return to look mode<br>
     <br>
     <b style="color:#a44">COMMANDS</b><br>
     examine [object]<br>
@@ -229,8 +232,15 @@ class PLControls {
   }
 }
 const controls = new PLControls(camera, canvas);
-controls.on('lock', ()=>{ document.getElementById('xhair').style.opacity='1'; });
-controls.on('unlock', ()=>{ document.getElementById('xhair').style.opacity='0.4'; });
+const modeBadge = document.getElementById('mode-badge');
+controls.on('lock', ()=>{
+  document.getElementById('xhair').style.opacity='1';
+  modeBadge.textContent='LOOK'; modeBadge.style.color='#500';
+});
+controls.on('unlock', ()=>{
+  document.getElementById('xhair').style.opacity='0.4';
+  modeBadge.textContent='TYPE'; modeBadge.style.color='#a44';
+});
 
 // ── Audio Engine ──────────────────────────────────────────────────
 let audioCtx = null;
@@ -1695,6 +1705,20 @@ function checkHiddenEnding() {
 // ── WASD Movement ─────────────────────────────────────────────────
 const keys = {};
 document.addEventListener('keydown', e=>{
+  // Any printable character while pointer is locked → redirect to command input
+  if(controls.isLocked && GS.started && !GS.gameOver &&
+     e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    controls.unlock();
+    cmdEl.value += e.key;
+    setTimeout(()=>cmdEl.focus(), 30);
+    return;
+  }
+  // Enter while pointer is locked → activate command input
+  if(e.code === 'Enter' && controls.isLocked && GS.started && !GS.gameOver) {
+    controls.unlock();
+    setTimeout(()=>cmdEl.focus(), 30);
+    return;
+  }
   keys[e.code]=true;
   if(e.code==='KeyE') handleEInteract();
 });
@@ -1802,7 +1826,13 @@ cmdEl.addEventListener('keydown', e=>{
       handleCommand(val);
       cmdEl.value='';
     }
+    // Return to look/move mode after submitting
+    cmdEl.blur();
+    setTimeout(()=>{ if(GS.started && !GS.gameOver) controls.lock(); }, 80);
     e.preventDefault();
+  } else if(e.key==='Escape') {
+    cmdEl.blur();
+    setTimeout(()=>{ if(GS.started && !GS.gameOver) controls.lock(); }, 80);
   }
   e.stopPropagation();
 });
