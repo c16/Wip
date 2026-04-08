@@ -233,14 +233,6 @@ class PLControls {
 }
 const controls = new PLControls(camera, canvas);
 const modeBadge = document.getElementById('mode-badge');
-controls.on('lock', ()=>{
-  document.getElementById('xhair').style.opacity='1';
-  modeBadge.textContent='LOOK'; modeBadge.style.color='#500';
-});
-controls.on('unlock', ()=>{
-  document.getElementById('xhair').style.opacity='0.4';
-  modeBadge.textContent='TYPE'; modeBadge.style.color='#a44';
-});
 
 // ── Audio Engine ──────────────────────────────────────────────────
 let audioCtx = null;
@@ -1704,21 +1696,38 @@ function checkHiddenEnding() {
 
 // ── WASD Movement ─────────────────────────────────────────────────
 const keys = {};
+let commandMode = false;   // true while the text input is active
+
+function enterCommandMode(initialChar) {
+  if(commandMode) return;
+  commandMode = true;
+  modeBadge.textContent='TYPE'; modeBadge.style.color='#a44';
+  document.getElementById('xhair').style.opacity='0.4';
+  if(controls.isLocked) controls.unlock();
+  if(initialChar) cmdEl.value += initialChar;
+  cmdEl.focus();
+}
+
+function exitCommandMode() {
+  if(!commandMode) return;
+  commandMode = false;
+  modeBadge.textContent='LOOK'; modeBadge.style.color='#500';
+  document.getElementById('xhair').style.opacity='1';
+  cmdEl.blur();
+  if(GS.started && !GS.gameOver) controls.lock();
+}
+
 document.addEventListener('keydown', e=>{
-  // Any printable character while pointer is locked → redirect to command input
-  if(controls.isLocked && GS.started && !GS.gameOver &&
-     e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-    controls.unlock();
-    cmdEl.value += e.key;
-    setTimeout(()=>cmdEl.focus(), 30);
+  if(!GS.started || GS.gameOver) return;
+  // Don't intercept while command input is active
+  if(commandMode) return;
+  // Any printable character → switch to command mode with that char
+  if(e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+    enterCommandMode(e.key);
     return;
   }
-  // Enter while pointer is locked → activate command input
-  if(e.code === 'Enter' && controls.isLocked && GS.started && !GS.gameOver) {
-    controls.unlock();
-    setTimeout(()=>cmdEl.focus(), 30);
-    return;
-  }
+  // Enter → open command input empty
+  if(e.code === 'Enter') { enterCommandMode(); return; }
   keys[e.code]=true;
   if(e.code==='KeyE') handleEInteract();
 });
@@ -1821,24 +1830,20 @@ const cmdEl = document.getElementById('cmd');
 cmdEl.addEventListener('keydown', e=>{
   if(e.key==='Enter'){
     const val = cmdEl.value.trim();
+    cmdEl.value = '';
     if(val) {
       addLog(`<span style="color:#866">> ${val}</span>`);
       handleCommand(val);
-      cmdEl.value='';
     }
-    // Return to look/move mode after submitting
-    cmdEl.blur();
-    setTimeout(()=>{ if(GS.started && !GS.gameOver) controls.lock(); }, 80);
+    exitCommandMode();
     e.preventDefault();
   } else if(e.key==='Escape') {
-    cmdEl.blur();
-    setTimeout(()=>{ if(GS.started && !GS.gameOver) controls.lock(); }, 80);
+    cmdEl.value = '';
+    exitCommandMode();
   }
   e.stopPropagation();
 });
-cmdEl.addEventListener('click', e=>e.stopPropagation());
-cmdEl.addEventListener('focus', ()=>{ if(controls.isLocked) controls.unlock(); });
-
+cmdEl.addEventListener('click', e=>{ e.stopPropagation(); enterCommandMode(); });
 // Prevent game keys from firing while typing
 ['keydown','keyup'].forEach(ev=>
   cmdEl.addEventListener(ev, e=>e.stopPropagation())
