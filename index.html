@@ -122,7 +122,7 @@
 <div id="start">
   <h1>SHADOWED ECHOES</h1>
   <div class="subtitle">A Victorian Horror Experience</div>
-  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.2</div>
+  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.4</div>
   <div class="story">
     You awaken on the cold stone floor of Ashwood Manor, your memory a shredded ruin.
     Rain hammers the shuttered windows. The grandfather clock in the hall has stopped at 3:13 AM.
@@ -197,7 +197,7 @@ class PLControls {
     const eu = new THREE.Euler(0,0,0,'YXZ');
     const PI2 = Math.PI/2;
     this._mm = e => {
-      if(!this.isLocked) return;
+      if(!this.isLocked || window._cmdMode) return;
       eu.setFromQuaternion(cam.quaternion);
       eu.y -= (e.movementX||0)*0.002;
       eu.x -= (e.movementY||0)*0.002;
@@ -1700,9 +1700,9 @@ let commandMode = false;   // true while the text input is active
 function enterCommandMode(initialChar) {
   if(commandMode) return;
   commandMode = true;
+  window._cmdMode = true;   // pause mouse-look without dropping pointer lock
   modeBadge.textContent='TYPE'; modeBadge.style.color='#a44';
   document.getElementById('xhair').style.opacity='0.4';
-  if(controls.isLocked) controls.unlock();
   if(initialChar) cmdEl.value += initialChar;
   cmdEl.focus();
 }
@@ -1710,10 +1710,11 @@ function enterCommandMode(initialChar) {
 function exitCommandMode() {
   if(!commandMode) return;
   commandMode = false;
+  window._cmdMode = false;
   modeBadge.textContent='LOOK'; modeBadge.style.color='#500';
   document.getElementById('xhair').style.opacity='1';
   cmdEl.blur();
-  if(GS.started && !GS.gameOver) controls.lock();
+  // Pointer lock is never released so no re-lock needed — paint is unblocked
 }
 
 document.addEventListener('keydown', e=>{
