@@ -174,7 +174,7 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x000000, 0.04);
+scene.fog = new THREE.FogExp2(0x0a0503, 0.018);
 scene.background = new THREE.Color(0x000000);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100);
@@ -341,12 +341,12 @@ function playChildLaughter() {
 
 // ── Material Library ──────────────────────────────────────────────
 const MAT = {
-  wall:    new THREE.MeshLambertMaterial({color:0x2a1f1a}),
-  wallDk:  new THREE.MeshLambertMaterial({color:0x1a120e}),
-  floor:   new THREE.MeshLambertMaterial({color:0x1c1008}),
-  ceiling: new THREE.MeshLambertMaterial({color:0x150e0a}),
-  wood:    new THREE.MeshLambertMaterial({color:0x3b2010}),
-  stone:   new THREE.MeshLambertMaterial({color:0x252220}),
+  wall:    new THREE.MeshLambertMaterial({color:0x5a4535}),
+  wallDk:  new THREE.MeshLambertMaterial({color:0x3a2820}),
+  floor:   new THREE.MeshLambertMaterial({color:0x3c2c18}),
+  ceiling: new THREE.MeshLambertMaterial({color:0x2a1e14}),
+  wood:    new THREE.MeshLambertMaterial({color:0x6b4020}),
+  stone:   new THREE.MeshLambertMaterial({color:0x484440}),
   red:     new THREE.MeshLambertMaterial({color:0x8b0000}),
   dark:    new THREE.MeshLambertMaterial({color:0x0d0d0d}),
   brass:   new THREE.MeshLambertMaterial({color:0x8b6914}),
@@ -387,7 +387,7 @@ function buildRoom(x, z, w, d, h, mats) {
 }
 
 // ── Ambient Light (very dim) ──────────────────────────────────────
-const ambLight = new THREE.AmbientLight(0x110808, 0.3);
+const ambLight = new THREE.AmbientLight(0x332211, 1.2);
 scene.add(ambLight);
 
 // ── Room Definitions ─────────────────────────────────────────────
@@ -399,7 +399,7 @@ const ROOMS = {
     desc:"You stand in the grand entrance hall of Ashwood Manor. Crumbling wallpaper peels from the walls in long strips. A massive chandelier hangs dark overhead, its candles long dead. The front door — your only exit — is sealed with an ornate golden lock. A grandfather clock stands silent, hands frozen at 3:13. Staircases rise on either side toward the upper floor. Hallways lead north to the dining room and east to the library.",
     exits:{north:'dining_room', east:'library', up:'upstairs_hallway', west:'kitchen'},
     items:['old_photograph','diary_page_1'],
-    lights:[{x:0,y:3.2,z:0,col:0x442211,int:0.6,dist:12}],
+    lights:[{x:0,y:3.2,z:0,col:0xc87941,int:2.5,dist:22}],
     dark:false
   },
   dining_room: {
@@ -408,7 +408,7 @@ const ROOMS = {
     desc:"A long mahogany table dominates the room, set for a dinner party that never came. Tarnished silverware lies scattered. Melted candles have dripped into grotesque formations. A portrait of the Ashwood patriarch stares down from above the fireplace — his eyes seem to follow you. A cold draft seeps under the kitchen door to the west. Serving dishes still contain the desiccated remnants of a feast.",
     exits:{south:'entrance_hall', west:'kitchen', north:'basement_stairs'},
     items:['torn_note_1','candle'],
-    lights:[{x:0,y:3,z:0,col:0x331100,int:0.5,dist:10}],
+    lights:[{x:0,y:3,z:0,col:0xb06030,int:2.0,dist:18}],
     dark:false
   },
   kitchen: {
@@ -417,7 +417,7 @@ const ROOMS = {
     desc:"The kitchen reeks of rot and decay. Iron pots hang from ceiling hooks. The stone hearth is cold and filled with ash. A butcher's block bears deep, frantic scratches — not from knives. Shelves of mouldering provisions line the walls. A locked door in the corner leads to the servant quarters. Broken crockery crunches underfoot.",
     exits:{east:'entrance_hall', south:'dining_room', north:'servant_quarters'},
     items:['matches','iron_key'],
-    lights:[{x:0,y:2.5,z:0,col:0x221100,int:0.4,dist:8}],
+    lights:[{x:0,y:2.5,z:0,col:0xa05828,int:1.8,dist:15}],
     dark:false,
     lockedDoors:{servant_quarters:{key:'iron_key', msg:"The servant quarters door is padlocked shut. There must be a key somewhere."}}
   },
@@ -427,7 +427,7 @@ const ROOMS = {
     desc:"Floor-to-ceiling bookshelves crowd every wall. Thousands of volumes gather dust, many fallen open to pages of arcane diagrams. A leather armchair faces the cold fireplace. A reading desk holds a magnifying glass and scattered papers. One bookshelf on the north wall looks subtly different from the others — its books are arranged in a strange pattern. The brass key you found suggests a locked door somewhere in this house...",
     exits:{west:'entrance_hall'},
     items:['diary_page_2','brass_key_found'],
-    lights:[{x:0,y:3.5,z:0,col:0x221408,int:0.5,dist:11}],
+    lights:[{x:0,y:3.5,z:0,col:0xb07840,int:2.0,dist:20}],
     dark:false,
     lockedEntry:{key:'brass_key', msg:"The library door is locked. You need a brass key."},
     puzzles:{bookshelf:{solved:false, reveals:'hidden_study'}}
@@ -438,7 +438,7 @@ const ROOMS = {
     desc:"A long corridor stretches ahead, doors on either side. Faded portraits of stern-faced ancestors line the walls. The floorboards creak hideously with every step. At the far end, a door leads to the attic. Strange scratches mark the wainscoting — long, desperate gouges at shoulder height. A child's music box lies broken on the floor, its mechanism still twitching.",
     exits:{south:'entrance_hall', east:'master_bedroom', west:'bedroom2', north:'bathroom', up:'attic'},
     items:['diary_page_3','strange_doll'],
-    lights:[{x:0,y:2.5,z:-5,col:0x1a0a0a,int:0.4,dist:8},{x:0,y:2.5,z:5,col:0x1a0a0a,int:0.3,dist:6}],
+    lights:[{x:0,y:2.5,z:-6,col:0x9a5030,int:1.6,dist:14},{x:0,y:2.5,z:6,col:0x9a5030,int:1.6,dist:14}],
     dark:false
   },
   master_bedroom: {
@@ -447,7 +447,7 @@ const ROOMS = {
     desc:"Lord Ashwood's bedroom. A four-poster bed dominates the room, its canopy rotted to tatters. The vanity mirror is shattered — seven pieces of glass lie arranged on the floor in a deliberate pattern. A writing desk holds a half-finished letter, the ink long dried. The wardrobe stands slightly ajar. Something has been scratching at the inside of the wardrobe door.",
     exits:{west:'upstairs_hallway'},
     items:['diary_page_4','torn_note_2'],
-    lights:[{x:0,y:2.5,z:0,col:0x1a0808,int:0.45,dist:9}],
+    lights:[{x:0,y:2.5,z:0,col:0x903828,int:1.8,dist:16}],
     dark:false
   },
   bedroom2: {
@@ -456,7 +456,7 @@ const ROOMS = {
     desc:"This was a child's room once. Moth-eaten stuffed animals sit in a ring on the floor as if conducting a ritual. Crayon drawings cover the walls — scenes of a tall, dark figure watching from doorways, from windows, from beneath beds. The drawings grow progressively more frantic. The last drawing, scrawled in red, simply says: IT KNOWS WE CAN SEE IT. A tiny bed is perfectly made, as if waiting.",
     exits:{east:'upstairs_hallway'},
     items:['torn_note_3'],
-    lights:[{x:0,y:2.5,z:0,col:0x150808,int:0.4,dist:8}],
+    lights:[{x:0,y:2.5,z:0,col:0x883020,int:1.6,dist:15}],
     dark:false
   },
   bathroom: {
@@ -465,7 +465,7 @@ const ROOMS = {
     desc:"A Victorian bathroom with a clawfoot tub. The tub is filled with black water, still as glass. The mirror above the basin is coated in grime — except where someone has written in the condensation: CHECK BEHIND THE CLOCK. The writing has been written and re-written, repeatedly, obsessively. The floorboards near the tub are soft and discoloured, as if perpetually wet.",
     exits:{south:'upstairs_hallway'},
     items:['torn_note_4'],
-    lights:[{x:0,y:2.3,z:0,col:0x0a0a15,int:0.3,dist:7}],
+    lights:[{x:0,y:2.3,z:0,col:0x6070a0,int:1.4,dist:13}],
     dark:false
   },
   attic: {
@@ -474,7 +474,7 @@ const ROOMS = {
     desc:"The attic is a cathedral of shadows and forgotten things. Draped furniture lurks under moth-eaten sheets. Trunks and hatboxes teeter in towers. A single small window admits a sliver of moonlight, illuminating swirling dust. At the centre of the room, a pentagram has been chalked on the floorboards — recently, judging by the freshness of the chalk. A trapdoor in the floor leads back down.",
     exits:{down:'upstairs_hallway'},
     items:['diary_page_5','golden_key'],
-    lights:[{x:0,y:2.5,z:0,col:0x0a0808,int:0.25,dist:10}],
+    lights:[{x:0,y:2.5,z:0,col:0x7090b0,int:1.2,dist:18}],
     dark:true
   },
   basement: {
@@ -493,7 +493,7 @@ const ROOMS = {
     desc:"A cramped room with a narrow iron bed and a single wooden chest. The servants who lived here left in great haste — half-packed bags still sit by the door. A hasty note is pinned to the pillow. On the wall, scratched with something sharp: IT TAKES THE FACE OF THOSE IT KILLS. The chest is unlocked.",
     exits:{south:'kitchen'},
     items:['torn_note_6','old_photograph_2'],
-    lights:[{x:0,y:2.3,z:0,col:0x100808,int:0.35,dist:7}],
+    lights:[{x:0,y:2.3,z:0,col:0x904030,int:1.6,dist:14}],
     dark:false
   },
   hidden_study: {
@@ -502,7 +502,7 @@ const ROOMS = {
     desc:"Behind the false bookshelf lies Lord Ashwood's secret study. Maps and diagrams cover every surface. A ritual circle is painted on the floor in silver and black. Three large candles burn with an unnatural blue flame — they should not still be burning after seventeen years. The centrepiece is a leather-bound tome: THE ASHWOOD CODEX. Beside it, a final diary entry explains everything. A hidden ladder leads down to the basement.",
     exits:{west:'library', down:'basement'},
     items:['ashwood_codex'],
-    lights:[{x:0,y:2.5,z:0,col:0x001122,int:0.8,dist:8}],
+    lights:[{x:0,y:2.5,z:0,col:0x4080c0,int:2.2,dist:16}],
     dark:false, hidden:true
   },
   grand_staircase: {
@@ -511,7 +511,7 @@ const ROOMS = {
     desc:"The grand staircase sweeps upward in two curving flights. The carpet runner is stained with dark patches. The banister has been recently gripped — the dust has been disturbed in clear handprints. At the base of the stairs, a child's shoe sits alone.",
     exits:{south:'entrance_hall', north:'upstairs_hallway'},
     items:[],
-    lights:[{x:0,y:4,z:0,col:0x220d0a,int:0.4,dist:10}],
+    lights:[{x:0,y:4,z:0,col:0xb06030,int:2.0,dist:18}],
     dark:false
   },
 };
@@ -1673,8 +1673,8 @@ const moveSpeed = 5;
 
 function handleMovement(dt) {
   if(!controls.isLocked || !GS.started || GS.gameOver) return;
-  if(keys['KeyW']||keys['ArrowUp'])    controls.forward(-moveSpeed*dt);
-  if(keys['KeyS']||keys['ArrowDown'])  controls.forward( moveSpeed*dt);
+  if(keys['KeyW']||keys['ArrowUp'])    controls.forward( moveSpeed*dt);
+  if(keys['KeyS']||keys['ArrowDown'])  controls.forward(-moveSpeed*dt);
   if(keys['KeyA']||keys['ArrowLeft'])  controls.right(-moveSpeed*dt);
   if(keys['KeyD']||keys['ArrowRight']) controls.right( moveSpeed*dt);
 
