@@ -914,13 +914,16 @@ function removeItemMesh(itemId) {
 // ── Log System ────────────────────────────────────────────────────
 const logEl = document.getElementById('log');
 const logLines = [];
+let _logFlashTimer = null;
 function addLog(msg, cls='') {
   logLines.push(`<p class="${cls} new">${msg}</p>`);
   if(logLines.length>8) logLines.shift();
   logEl.innerHTML = logLines.join('');
-  // Remove 'new' class after brief flash
-  setTimeout(()=>{
+  // Debounce the flash-removal so we never stack hundreds of timers
+  if(_logFlashTimer) clearTimeout(_logFlashTimer);
+  _logFlashTimer = setTimeout(()=>{
     logEl.querySelectorAll('.new').forEach(el=>el.classList.remove('new'));
+    _logFlashTimer = null;
   }, 600);
 }
 
@@ -1689,20 +1692,19 @@ function handleMovement(dt) {
 }
 
 // ── Room Detection (auto-enter adjacent rooms) ────────────────────
+let _roomChangeCooldown = 0;
 function detectRoomChange() {
-  // Check if player has walked far enough toward an exit
+  if(_roomChangeCooldown > 0) return;
   const pos = camera.position;
   const cr = ROOMS[GS.currentRoom];
   if(!cr) return;
   const margin = 1.0;
-  // North exit
-  if(cr.exits?.north && pos.z < cr.z - cr.d/2 + margin) tryMove('north');
-  // South
-  else if(cr.exits?.south && pos.z > cr.z + cr.d/2 - margin) tryMove('south');
-  // East
-  else if(cr.exits?.east && pos.x > cr.x + cr.w/2 - margin) tryMove('east');
-  // West
-  else if(cr.exits?.west && pos.x < cr.x - cr.w/2 + margin) tryMove('west');
+  let moved = false;
+  if     (cr.exits?.north && pos.z < cr.z - cr.d/2 + margin) { tryMove('north'); moved=true; }
+  else if(cr.exits?.south && pos.z > cr.z + cr.d/2 - margin) { tryMove('south'); moved=true; }
+  else if(cr.exits?.east  && pos.x > cr.x + cr.w/2 - margin) { tryMove('east');  moved=true; }
+  else if(cr.exits?.west  && pos.x < cr.x - cr.w/2 + margin) { tryMove('west');  moved=true; }
+  if(moved) _roomChangeCooldown = 0.8; // 800 ms grace period after any transition
 }
 
 // ── Main Game Loop ────────────────────────────────────────────────
@@ -1715,9 +1717,11 @@ function animate() {
   if(!GS.started || GS.gameOver) { renderer.render(scene,camera); return; }
 
   GS.gameTime += dt;
+  _roomChangeCooldown = Math.max(0, _roomChangeCooldown - dt);
   handleMovement(dt);
   detectRoomChange();
-  checkLookTarget();
+  // Raycast only every 4th frame — imperceptible to the player, big CPU saving
+  if(renderer.info.render.frame % 4 === 0) checkLookTarget();
   updateMonster(dt);
   updateHorrorEffects(dt);
   checkHiddenEnding();
