@@ -123,7 +123,7 @@
 <div id="start">
   <h1>SHADOWED ECHOES</h1>
   <div class="subtitle">A Victorian Horror Experience</div>
-  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.9</div>
+  <div style="font-size:11px;color:#400;letter-spacing:3px;margin-top:-22px;margin-bottom:22px">v1.0.15</div>
   <div class="story">
     You awaken on the cold stone floor of Ashwood Manor, your memory a shredded ruin.
     Rain hammers the shuttered windows. The grandfather clock in the hall has stopped at 3:13 AM.
@@ -742,16 +742,39 @@ function addFurniture(roomId) {
     // Chandelier
     box(1.5,0.2,1.5,MAT.iron,0,3.8,0);
     box(0.05,1.2,0.05,MAT.iron,0,3.2,0);
-    // Clock
+    // Grandfather clock (interactable — hides brass key)
     const clk=box(0.5,2.0,0.3,MAT.wood,-4.5,1.0,-5);
     clk.userData={interactable:true,id:'grandfather_clock',label:'Grandfather Clock'};
     itemMeshes['grandfather_clock']=clk;
-    // Side table
-    box(0.8,0.8,0.4,MAT.wood,3,0.4,4);
+    // Side table (decoration)
+    box(0.8,0.08,0.4,MAT.wood,3,0.82,4);
     box(0.05,0.8,0.05,MAT.wood,2.65,0.4,3.75);
     box(0.05,0.8,0.05,MAT.wood,3.35,0.4,3.75);
     box(0.05,0.8,0.05,MAT.wood,2.65,0.4,4.25);
     box(0.05,0.8,0.05,MAT.wood,3.35,0.4,4.25);
+    // Grand staircase — two visible flights + interactable marker
+    const stairMat = new THREE.MeshLambertMaterial({color:0x5a3a1a});
+    for(let i=0;i<6;i++){
+      const step=new THREE.Mesh(new THREE.BoxGeometry(2.5,0.15,0.4),stairMat);
+      step.position.set(ox+2, 0.15+i*0.28, oz-2-i*0.38);
+      step.castShadow=true; scene.add(step);
+      const step2=new THREE.Mesh(new THREE.BoxGeometry(2.5,0.15,0.4),stairMat);
+      step2.position.set(ox-2, 0.15+i*0.28, oz-2-i*0.38);
+      step2.castShadow=true; scene.add(step2);
+    }
+    // Staircase landing marker — interactable
+    const landingMat=new THREE.MeshLambertMaterial({color:0x8b6914,emissive:0x332200});
+    const landing=new THREE.Mesh(new THREE.BoxGeometry(2,0.05,0.8),landingMat);
+    landing.position.set(ox, 1.82, oz-4.1);
+    landing.userData={interactable:true,id:'staircase',label:'Go Upstairs [E]'};
+    scene.add(landing);
+    itemMeshes['staircase']=landing;
+    // Glowing floor arrows near each horizontal exit
+    const arrowMat=new THREE.MeshLambertMaterial({color:0x4a2a0a,emissive:0x1a0a00});
+    [[-5,0,'north'],[ 5,0,'south'],[0,-4,'east'],[0,4,'west']].forEach(([ax,az,dir])=>{
+      const arr=new THREE.Mesh(new THREE.BoxGeometry(0.6,0.02,0.6),arrowMat);
+      arr.position.set(ox+ax,0.06,oz+az); scene.add(arr);
+    });
   }
   if(roomId==='dining_room'){
     // Table
@@ -986,16 +1009,23 @@ function enterRoom(roomId) {
 
   if(!GS.visitedRooms.has(roomId)) {
     GS.visitedRooms.add(roomId);
-    // Show room description on first visit
     addLog(`<b style="color:#e44">${r.name}</b>`);
     const desc = (roomId==='basement' && GS.litBasement) ? r.descLit : r.desc;
-    // Split into two lines for readability
     const words = desc.split(' ');
     const mid = Math.floor(words.length/2);
     addLog(words.slice(0,mid).join(' ')+'...');
     addLog('...'+words.slice(mid).join(' '));
   } else {
     addLog(`You are in the <b style="color:#e44">${r.name}</b>.`);
+  }
+  // Always show exits so player knows where to go
+  if(r.exits) {
+    const exitNames = {north:'north',south:'south',east:'east',west:'west',up:'up (stairs)',down:'down (stairs)'};
+    const available = Object.entries(r.exits)
+      .filter(([dir,id])=> dir!=='up'&&dir!=='down' || true) // include all
+      .filter(([dir,id])=> !(GS.lockedDoors[id]) && !(id==='hidden_study'&&!GS.hiddenStudyRevealed))
+      .map(([dir])=>exitNames[dir]||dir);
+    if(available.length) addLog(`Exits: <span style="color:#a66">${available.join(', ')}</span>. Walk into a wall or type 'go [direction]'.`);
   }
 
   // Sanity effects from dark rooms
@@ -1202,6 +1232,10 @@ function handleCommand(input) {
     if(!rest) { addLog("Examine what?"); return; }
 
     // Special interactables
+    if(rest.includes('stair')||rest.includes('staircase')||rest.includes('upstairs')||rest.includes('landing')) {
+      addLog("Grand Victorian staircases sweep upward on either side. The carpet runner is stained dark. Press E or type 'go up' to climb.");
+      return;
+    }
     if(rest.includes('clock')||rest.includes('grandfather')) {
       addLog("The grandfather clock stands frozen at 3:13. The pendulum has stopped. Behind it, taped to the back panel...");
       if(!GS.inventory.includes('brass_key')) {
@@ -1775,6 +1809,7 @@ function handleEInteract() {
   if(!GS.started||GS.gameOver) return;
   if(lookTarget) {
     const ud = lookTarget.userData;
+    if(ud.id==='staircase') { tryMove('up'); return; }
     if(ud.type==='item') {
       const it = ITEMS[ud.id];
       if(it) { addLog(it.look); if(it.canTake && !it.taken) addLog(`Type 'take ${it.short}' to pick it up.`); }
@@ -1818,6 +1853,7 @@ function detectRoomChange() {
   else if(cr.exits?.south && pos.z > cr.z + cr.d/2 - margin) { tryMove('south'); moved=true; }
   else if(cr.exits?.east  && pos.x > cr.x + cr.w/2 - margin) { tryMove('east');  moved=true; }
   else if(cr.exits?.west  && pos.x < cr.x - cr.w/2 + margin) { tryMove('west');  moved=true; }
+  // up/down exits are handled via 'go up/down' text command or E on staircase mesh
   if(moved) _roomChangeCooldown = 0.8; // 800 ms grace period after any transition
 }
 
