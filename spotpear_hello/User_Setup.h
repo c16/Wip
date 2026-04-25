@@ -21,9 +21,6 @@
 #define TFT_RST   5   // Reset
 #define TFT_BL   -1   // Backlight always on — no GPIO control
 
-// Use VSPI bus
-#define USE_HSPI_PORT
-
 // SPI frequency
 #define SPI_FREQUENCY       27000000
 #define SPI_READ_FREQUENCY   5000000
