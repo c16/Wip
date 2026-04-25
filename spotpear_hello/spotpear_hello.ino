@@ -183,13 +183,6 @@ void setup()
     pinMode(BTN2, INPUT_PULLUP);
     pinMode(BOOT, INPUT_PULLUP);
 
-    // Pre-initialise FSPI so the spi_t struct (and its mutex) exist before
-    // TFT_eSPI calls spiStartBus() → spiDetachBus() internally.
-    // Without this, spiDetachBus crashes on an uninitialised struct on
-    // arduino-esp32 3.x.  Has no effect on 2.0.17 where it is not needed.
-    SPI.begin(3, -1, 4, 2);  // SCLK, MISO, MOSI, CS
-    Serial.println("SPI pre-init done");
-
     tft.init();
     tft.setRotation(2);   // 180° — correct orientation for this board
     tft.fillScreen(TFT_BLACK);
