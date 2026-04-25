@@ -19,10 +19,16 @@
 #define TFT_CS    2   // Chip select
 #define TFT_DC    0   // Data/Command
 #define TFT_RST   5   // Reset
+#define TFT_MISO -1   // Not connected — must be explicit or TFT_eSPI picks a default
 #define TFT_BL   -1   // Backlight always on — no GPIO control
 
+// ESP32-C3 has only one user SPI bus (SPI2).
+// Without USE_HSPI_PORT TFT_eSPI targets VSPI (SPI3) which doesn't
+// exist on the C3, causing spiStartBus() to return NULL and crash.
+#define USE_HSPI_PORT
+
 // SPI frequency
-#define SPI_FREQUENCY       27000000
+#define SPI_FREQUENCY       20000000
 #define SPI_READ_FREQUENCY   5000000
 
 // Colour byte order for this panel
