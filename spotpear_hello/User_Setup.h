@@ -22,10 +22,10 @@
 #define TFT_MISO -1   // Not connected — must be explicit or TFT_eSPI picks a default
 #define TFT_BL   -1   // Backlight always on — no GPIO control
 
-// ESP32-C3 has only one user SPI bus (SPI2).
-// Without USE_HSPI_PORT TFT_eSPI targets VSPI (SPI3) which doesn't
-// exist on the C3, causing spiStartBus() to return NULL and crash.
-#define USE_HSPI_PORT
+// ESP32-C3 exposes SPI2 as FSPI (index 0) — the only user SPI.
+// USE_HSPI_PORT (index 1) is explicitly out of range on C3.
+// arduino-esp32 redefines VSPI=0 on C3, so the default (no define)
+// resolves to the correct FSPI bus. Do NOT add USE_HSPI_PORT here.
 
 // SPI frequency
 #define SPI_FREQUENCY       20000000
