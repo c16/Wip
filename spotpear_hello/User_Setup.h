@@ -22,10 +22,16 @@
 #define TFT_MISO -1   // Not connected — must be explicit or TFT_eSPI picks a default
 #define TFT_BL   -1   // Backlight always on — no GPIO control
 
-// ESP32-C3 exposes SPI2 as FSPI (index 0) — the only user SPI.
-// USE_HSPI_PORT (index 1) is explicitly out of range on C3.
-// arduino-esp32 redefines VSPI=0 on C3, so the default (no define)
-// resolves to the correct FSPI bus. Do NOT add USE_HSPI_PORT here.
+// ---- ESP32-C3 SPI bus workaround ----
+// On ESP32-C3 the only user SPI is SPI2, exposed as FSPI (index 0).
+// Older arduino-esp32 versions leave VSPI=2 (the classic ESP32 value).
+// spiDetachBus() then tries to access SPI3 registers that don't
+// exist on C3, causing a Store access fault.
+// Redefining VSPI=0 here (before TFT_eSPI instantiates its SPIClass)
+// forces it to target FSPI/SPI2 instead.
+// Long-term fix: update arduino-esp32 board package and TFT_eSPI library.
+#undef  VSPI
+#define VSPI 0
 
 // SPI frequency
 #define SPI_FREQUENCY       20000000
